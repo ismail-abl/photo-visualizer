@@ -1,340 +1,301 @@
 # photo-visualizer
-visualise, convert, harmonize metada
 
-## Vision du projet
+Application desktop locale pour scanner, analyser, convertir et renommer des photos personnelles en lot, avec priorité à la sécurité des données, au traitement hors ligne et à un exécutable Windows autonome.
 
-PhotoApp est une application de bureau pensée pour traiter un volume d’environ 10 000 images stockées localement, sans cloud ni serveur distant. L’objectif principal est de fournir un outil pratique pour remettre de l’ordre dans une collection de photos personnelles en détectant les fichiers image, en normalisant les dates associées et en proposant une compression contrôlée sans sacrifier inutilement la qualité visuelle.[1][2][3]
+## État actuel du projet
 
-Le projet vise en priorité Windows avec production d’un exécutable autonome, tout en gardant une base de code portable vers Linux et macOS. L’interface graphique repose sur Avalonia, qui cible les trois plateformes desktop depuis une même base .NET, tandis que la publication self-contained/single-file permet d’éviter l’installation préalable du runtime .NET côté utilisateur.[1][4][5][6]
+Le projet a dépassé le stade de prototype technique. La chaîne principale fonctionne sur Windows avec un build `self-contained` `single-file` validé en conditions réelles : sélection d’un dossier, scan automatique, résolution de date, prévisualisation du nom cible, conversion/renommage depuis l’interface, et suppression optionnelle de l’original après succès complet.
 
-## Objectifs fonctionnels
+### Ce qui marche aujourd’hui
 
-Le produit couvre quatre blocs fonctionnels principaux :
+- Sélection d’un dossier depuis l’interface graphique Avalonia.
+- Scan récursif automatique du dossier choisi et de ses sous-dossiers.
+- Détection des images prises en charge par le scanner.
+- Résolution d’une date retenue par image avec priorité explicite :
+  1. métadonnées natives lisibles ;
+  2. date parsée depuis le nom de fichier ;
+  3. date du système de fichiers en fallback.
+- Affichage dans l’UI de :
+  - nom source ;
+  - chemin complet ;
+  - taille ;
+  - date retenue ;
+  - source de la date ;
+  - nom cible proposé.
+- Génération d’un nom de sortie normalisé au format `IMG-YYYYMMDD-HHmmss.jpg` ou `IMG-YYYYMMDD-xxxxxx.jpg` selon les données disponibles.
+- Gestion déterministe des collisions de noms via suffixe court stable.
+- Pipeline de sortie sécurisé :
+  1. copie de travail ;
+  2. conversion JPEG ;
+  3. application des timestamps filesystem ;
+  4. déplacement vers le nom final ;
+  5. suppression optionnelle de l’original uniquement après succès complet.
+- Exécution de la conversion depuis l’UI avec résumé de succès/échecs.
+- Build Windows publié en `Release`, `win-x64`, `self-contained`, `single-file` testé et validé.
+- Suite de tests unitaires en place sur les briques critiques.
 
-- exploration récursive d’un dossier racine et de ses sous-dossiers ;
-- détection des formats d’image courants, en particulier JPEG, PNG et HEIF/HEIC ;
-- compression batch avec estimation des gains et conservation optionnelle des originaux ;
-- harmonisation des dates à partir des métadonnées EXIF, du nom de fichier ou de la date filesystem en dernier recours.[2][3][7]
+### Ce qui a été validé manuellement
 
-Le projet doit aussi fournir une interface de prévisualisation simple, avec filtres par date, dossier et source, ainsi qu’un aperçu avant/après des métadonnées quand une opération d’harmonisation est proposée. L’application est pensée comme un outil personnel fiable, pas comme un service en ligne ni comme une galerie cloud.[1][8]
+- Le choix d’un dossier suffit à lancer le scan ; le bouton de scan manuel a été retiré.
+- Le bouton de conversion est désormais piloté par un état calculé cohérent côté ViewModel.
+- Un test réel sur un dossier préparé exprès a été exécuté avec succès via l’exécutable publié.
+- Le bug du fichier temporaire `.tmp` a été corrigé en conservant l’extension réelle de la source pendant la phase intermédiaire.
+- Le package `SixLabors.ImageSharp` a été mis à jour pour supprimer les avertissements de sécurité observés pendant la publication.
 
-## Contraintes de départ
+## Ce qui ne marche pas encore ou reste limité
 
-Les contraintes structurantes déjà fixées sont les suivantes :
+Le projet n’est pas “terminé”, même si la v1 utile est désormais atteinte.
 
-- application **locale uniquement**, sans backend distant ;
-- GUI desktop obligatoire ;
-- priorité Windows pour la première livraison ;
-- portabilité recherchée vers Linux et macOS ;
-- exécutable autonome sans installation préalable de .NET sur la machine cible ;
-- code lisible, simple à maintenir, sans architecture inutilement lourde.[1][5][6][8]
+### Limites actuelles
 
-Un autre point important est l’exigence de packaging. Le projet cible un exécutable Windows publié en self-contained single-file, ce qui permet d’embarquer le runtime .NET directement dans l’application. En revanche, les dépendances natives tierces éventuelles doivent être choisies avec prudence, car elles compliquent le scénario “binaire unique” même si .NET lui-même n’est plus une dépendance externe.[5][9][10]
+- L’écriture des métadonnées internes EXIF/XMP/IPTC n’est **pas** encore implémentée.
+  - La date retenue est aujourd’hui réappliquée au **fichier de sortie côté filesystem**.
+  - La métadonnée intégrée dans l’image n’est pas encore réécrite.
+- Le support HEIC/HEIF n’est **pas garanti** pour la conversion JPEG dans l’état actuel.
+  - La lecture de date peut fonctionner selon les cas.
+  - La conversion réelle dépendra d’une brique complémentaire si nécessaire.
+- Il n’y a pas encore de galerie avancée, de miniatures persistées, ni de filtrage riche.
+- Il n’y a pas encore de mode d’annulation d’un batch en cours.
+- Il n’y a pas encore de journal d’exécution détaillé exportable.
+- Il n’y a pas encore de gestion avancée des doublons par contenu.
+- Le panneau debug affiché dans l’UI est temporaire et devra être remplacé par un affichage d’état plus propre.
 
-## Choix techniques retenus
+## Objectif produit actuel
 
-### Plateforme applicative
+L’objectif immédiat n’est plus de prouver que l’application peut démarrer, mais de stabiliser une v1 locale utile, sûre et maintenable pour traiter de vrais dossiers d’images personnelles.
 
-Le socle choisi est **.NET 10 LTS** avec **Avalonia 12** pour l’interface graphique. Avalonia supporte les plateformes desktop Windows, Linux et macOS, avec un minimum .NET 8 pour desktop, ce qui rend l’usage de .NET 10 cohérent pour une base moderne et durable.[1][11][4]
+En pratique, la version actuelle permet déjà de :
+- sélectionner un dossier ;
+- scanner les images ;
+- calculer une date retenue ;
+- proposer un nom normalisé ;
+- produire une copie convertie/renommée en JPEG ;
+- conserver ou supprimer l’original selon l’option choisie.
 
-Le mode de développement initial est **Windows + VS Code + .NET 10 SDK**. Les templates Avalonia officiels permettent de démarrer rapidement une application MVVM et l’écosystème VS Code dispose d’une extension Avalonia dédiée pour le support XAML.[11][12][13]
+## Stack technique retenue
 
-### Architecture logicielle
+### Application
 
-Le projet suit une séparation simple en couches :
+- **.NET 10**
+- **Avalonia UI** pour l’interface desktop
+- **CommunityToolkit.Mvvm** pour le ViewModel et les commandes
 
-| Projet | Rôle |
-|---|---|
-| `PhotoApp` | UI Avalonia, vues, view models, interactions utilisateur |
-| `PhotoApp.Core` | logique métier pure, scan, règles de résolution des dates, cas limites |
-| `PhotoApp.Tests` | tests unitaires et tests fonctionnels ciblés |
+### Cœur métier
 
-Cette séparation suit le pattern MVVM recommandé par Avalonia et permet de garder le code métier indépendant de l’interface graphique, ce qui simplifie la testabilité et le portage.[8][14][15]
+- `PhotoApp.Core` pour la logique de scan, de résolution de date, de planification de renommage et d’exécution batch
+- `PhotoApp.Tests` pour les tests unitaires
 
-### Traitement d’image
+### Lecture de métadonnées
 
-Pour le traitement batch lourd, la piste privilégiée est **libvips**, car la bibliothèque est reconnue pour ses performances et sa faible consommation mémoire sur le traitement d’images. Elle supporte de nombreux formats, dont JPEG, PNG et HEIF/HEIC selon les builds disponibles.[2][16]
+- Lecture native en .NET, sans dépendance runtime externe à ExifTool
 
-Ce choix reste à valider rapidement contre la contrainte de packaging Windows single-file. libvips est performant, mais sa chaîne de dépendances natives peut compliquer un binaire strictement monolithique ; ce point doit donc être traité comme un risque technique dès les premiers jalons.[17][18]
+### Conversion d’image
 
-### Métadonnées
+- Conversion JPEG basée sur `SixLabors.ImageSharp`
+- Copie directe pour les sources déjà JPEG afin d’éviter une recompression inutile
 
-Pour la lecture et l’écriture robustes des métadonnées, la piste prioritaire est **ExifTool**. ExifTool est spécialisé dans la lecture/écriture des métadonnées EXIF/XMP/IPTC et fonctionne sur Windows, macOS et Linux, ce qui en fait une brique très pertinente pour l’harmonisation temporelle.[3][7][19]
-
-L’objectif n’est pas de disperser la logique de tags dans toute l’application. Au contraire, l’accès aux métadonnées doit être encapsulé dans un service dédié, afin de garder un comportement prévisible et testable face aux différences de formats, d’exports WhatsApp ou de sauvegardes cloud.[3][7]
-
-## Priorités fonctionnelles
-
-L’ordre de mise en œuvre retenu est volontairement progressif.
-
-### 1. Valider le socle applicatif
-
-La première étape consiste à sécuriser l’environnement de développement, la création de projet Avalonia, l’exécution locale et la publication Windows self-contained single-file. Cette étape a déjà été validée avec succès sur un projet Avalonia MVVM en `net10.0` publié en `win-x64`.[20][5][21]
-
-### 2. Scanner les fichiers image
-
-La deuxième étape consiste à implémenter un scan récursif robuste d’un dossier racine, avec filtrage des extensions supportées, gestion des erreurs d’accès, et retour d’un modèle simple décrivant les fichiers détectés. C’est la base de presque toutes les autres fonctionnalités, car la compression, la visualisation et l’harmonisation reposent toutes sur un inventaire fiable des fichiers image.[15][8]
-
-### 3. Brancher l’UI sur le scan
-
-Une fois le scan implémenté dans `PhotoApp.Core`, il faut le connecter à l’interface : sélection d’un dossier, lancement du scan, affichage de la liste, nombre de fichiers, taille cumulée et retours d’erreurs utilisateur simples. À ce stade, l’objectif est encore la robustesse et la lisibilité, pas l’optimisation avancée.[8][14]
-
-### 4. Ajouter l’analyse des dates
-
-Ensuite vient la résolution des dates à partir d’une stratégie claire :
-
-1. date EXIF de prise de vue ;
-2. date déduite du nom de fichier si exploitable ;
-3. date de création/modification filesystem en dernier recours.
-
-Cette règle doit être codée explicitement et produire, pour chaque image, une explication de la source retenue afin d’être affichable dans l’interface et vérifiable en test.[3][7]
-
-### 5. Ajouter la compression
-
-La compression vient après, car elle est potentiellement destructive. Elle devra proposer plusieurs niveaux de qualité, afficher une estimation du gain, permettre de conserver les originaux, et traiter les formats en fonction des capacités réelles de la brique image retenue.[2][16]
-
-## Cas d’usage cibles
-
-Le projet doit couvrir plusieurs cas concrets de photos personnelles :
-
-- dossiers d’export WhatsApp, souvent avec noms de fichiers peu stables ;
-- exports Google Photos, parfois accompagnés de fichiers JSON ;
-- dossiers issus d’appareils photo ou smartphones avec EXIF fiables ;
-- sauvegardes iCloud, OneDrive ou Dropbox recopiées localement ;
-- dossiers hétérogènes avec doublons, sous-dossiers profonds et fichiers partiellement corrompus.
-
-Le comportement attendu n’est pas de “deviner” silencieusement. L’application doit au contraire rendre visible la source d’information utilisée, signaler les conflits et éviter toute écriture massive non explicite sur les fichiers originaux.[3][7]
-
-## Principes de conception
-
-### Confidentialité
-
-Toutes les opérations sont réalisées localement. Aucune synchronisation cloud, aucun backend web et aucun traitement distant ne font partie du produit cible. Cette contrainte protège la vie privée et réduit la surface de risque liée aux données personnelles.[1]
-
-### Robustesse
-
-Le scan et les opérations batch doivent être tolérants aux erreurs : un fichier illisible, un sous-dossier inaccessible ou une image corrompue ne doivent pas faire échouer l’ensemble du traitement. Chaque anomalie doit être journalisée et présentée de manière exploitable.[15]
-
-### Lisibilité
-
-Le projet doit rester simple. Pas d’architecture “enterprise”, pas de framework de plugins prématuré, pas de couche d’abstraction sans besoin concret. Le code métier doit rester direct, testable et compréhensible rapidement.[15][8]
-
-### Sécurité des données
-
-La compression et la réécriture des métadonnées doivent être conçues comme des opérations sensibles. Toute action modifiant les fichiers devra être précédée d’une prévisualisation, d’un résumé des changements et, si possible, d’une stratégie de sauvegarde ou de conservation des originaux.[3][7]
-
-## Architecture de code proposée
-
-Structure de dossier cible :
+## Architecture du dépôt
 
 ```text
-PhotoApp/
-├── PhotoApp.sln
+photo-visualizer/
 ├── PhotoApp/
-│   ├── Assets/
-│   ├── Converters/
 │   ├── Views/
 │   ├── ViewModels/
-│   ├── Services/
-│   ├── App.axaml
-│   └── Program.cs
+│   ├── Converters/
+│   ├── Assets/
+│   └── PhotoApp.csproj
 ├── PhotoApp.Core/
 │   ├── Models/
-│   ├── Scanning/
-│   ├── Metadata/
-│   ├── Compression/
-│   ├── Dates/
-│   └── Abstractions/
-└── PhotoApp.Tests/
-    ├── Scanning/
-    ├── Dates/
-    └── Metadata/
+│   ├── Services/
+│   └── PhotoApp.Core.csproj
+├── PhotoApp.Tests/
+│   └── PhotoApp.Tests.csproj
+├── run-published.ps1
+└── README.md
 ```
 
-L’UI Avalonia doit rester centrée sur la présentation, la navigation et l’orchestration des actions utilisateur. Toute logique de scan, de parsing de date, de décision métier ou de traitement fichier doit rester dans `PhotoApp.Core`.[8][14]
+## Fonctionnement actuel
 
-## Fonctionnalités prévues
+### Résolution de date
 
-### Scan récursif
+Pour chaque image, l’application tente de déterminer une date de référence avec cette priorité :
 
-Le scanner devra :
+1. métadonnées natives lisibles ;
+2. date détectée dans le nom de fichier ;
+3. date filesystem ;
+4. aucune date si rien n’est exploitable.
 
-- parcourir un dossier racine et tous ses sous-dossiers ;
-- reconnaître les extensions supportées ;
-- ignorer les fichiers non image ;
-- gérer les erreurs d’accès sans interrompre le traitement ;
-- remonter les fichiers potentiellement problématiques ;
-- fournir des métadonnées de base utiles à l’UI (nom, chemin, taille, extension).
+La source retenue est affichée dans l’interface pour rendre la décision visible.
 
-Une abstraction simple doit permettre plus tard d’ajouter détection de doublons, hachage, ou état “corrompu/suspect” sans casser la première implémentation.[15]
+### Nommage cible
 
-### Visualisation
+La convention actuelle de sortie est la suivante :
 
-L’interface devra offrir une visualisation basique mais fluide :
+- `IMG-YYYYMMDD-HHmmss.jpg` si la date et l’heure sont connues ;
+- `IMG-YYYYMMDD-HHmmss-xxxxxx.jpg` si collision ;
+- `IMG-YYYYMMDD-xxxxxx.jpg` si seule la date est connue.
 
-- liste ou grille des images détectées ;
-- compteur de fichiers ;
-- filtres par dossier, type, source de date ;
-- panneau détail avec aperçu de métadonnées ;
-- comparaison avant/après pour les opérations d’harmonisation.
+Le suffixe court est déterministe afin de garder un comportement stable entre deux traitements identiques.
 
-La première version ne doit pas viser une galerie sophistiquée. La priorité est la clarté de l’information et la stabilité sur une photothèque volumineuse.[8]
+### Pipeline de conversion
 
-### Harmonisation des dates
+Pour chaque fichier traité :
 
-Pour chaque image, l’application devra déterminer une date de référence à partir d’une stratégie ordonnée et explicite. Les écritures de métadonnées devront être traçables et réversibles autant que possible, avec journal des actions effectuées.[3][7]
+1. création d’une copie de travail ;
+2. conservation de l’extension source sur le fichier temporaire ;
+3. conversion vers JPEG si nécessaire ;
+4. application des timestamps filesystem ;
+5. déplacement vers le nom final dans le dossier de sortie ;
+6. suppression optionnelle de l’original après validation complète.
 
-### Compression
+Par défaut, les sorties sont écrites dans un sous-dossier `Converted` du dossier sélectionné.
 
-La compression devra proposer au minimum :
+## Ce qu’il faudrait encore implémenter
 
-- qualité configurable ;
-- aperçu du gain estimé ;
-- traitement batch ;
-- conservation optionnelle de l’original ;
-- résumé final du nombre de fichiers modifiés et de l’espace gagné.
+### Priorité haute
 
-La compatibilité exacte par format dépendra de la brique technique validée, en particulier pour HEIC/HEIF. Ce point doit rester visible dans les choix produit et dans la documentation développeur.[2][16][17]
+- Remplacer le panneau debug par un vrai panneau d’état utilisateur.
+- Ajouter un résumé d’exécution plus propre, éventuellement avec liste des erreurs.
+- Ajouter un vrai journal local des opérations batch.
+- Clarifier le comportement des formats non supportés dans l’UI.
+- Ajouter des tests supplémentaires sur des jeux réels de noms de fichiers.
 
-## Gestion des risques
+### Priorité moyenne
 
-### Risque packaging
+- Support plus explicite de HEIC/HEIF, soit par intégration, soit par exclusion assumée.
+- Écriture des métadonnées internes EXIF/XMP si cela peut être fait sans casser la contrainte de packaging.
+- Gestion des miniatures et d’un aperçu plus visuel.
+- Filtres par source de date, extension, dossier, état de conversion.
+- Détection de doublons.
 
-Le plus gros risque technique identifié est le conflit entre :
+### Priorité basse / plus tard
 
-- support de formats photo variés ;
-- dépendances natives performantes ;
-- volonté de distribuer un unique `.exe` autonome.
+- Cache local SQLite.
+- Historique des batches.
+- Annulation d’une opération longue.
+- Portage et validation Linux/macOS.
 
-Le runtime .NET peut être embarqué dans un déploiement self-contained single-file, mais les bibliothèques natives tierces peuvent compliquer le packaging ou impliquer une extraction interne au lancement. Ce sujet doit être validé très tôt avec un prototype réel, pas seulement supposé.[5][6][17]
+## Sécurité des données
 
-### Risque corruption/perte de données
+Le projet applique actuellement quelques règles simples mais importantes :
 
-Toute opération d’écriture sur des photos personnelles est sensible. Une erreur de logique peut provoquer une perte de métadonnées ou un écrasement non voulu. Le produit devra donc privilégier les prévisualisations, la journalisation et la conservation optionnelle des originaux.[3][7]
+- ne jamais modifier directement le fichier original ;
+- travailler sur une copie ;
+- ne supprimer l’original qu’après succès complet ;
+- afficher les noms cibles avant traitement ;
+- produire les sorties dans un sous-dossier dédié.
 
-### Risque performance UI
+Pour tout test sur de vraies photos, il est recommandé de commencer avec l’option **Effacer l’original après succès** décochée.
 
-Sur 10 000 images, une interface naïve peut devenir lente si elle charge trop tôt les miniatures ou maintient trop d’objets en mémoire. Il faudra donc garder une stratégie de chargement progressif, avec miniatures différées et listes adaptées à un gros volume.[2][16]
+## Développement
 
-## Construction et exécution
+### Prérequis
+
+- Windows 10/11
+- .NET 10 SDK installé
+- PowerShell pour le script de publication
 
 ### Build de développement
 
-Pour le développement, utiliser `dotnet build` :
-
-```bash
-dotnet build PhotoApp/PhotoApp.csproj
+```powershell
+dotnet build .\PhotoApp\PhotoApp.csproj
 ```
 
-### Build de distribution Windows
+### Lancer l’application en développement
 
-Pour produire un exécutable autonome Windows (self-contained single-file) :
-
-```bash
-dotnet publish PhotoApp/PhotoApp.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+```powershell
+dotnet run --project .\PhotoApp\PhotoApp.csproj
 ```
 
-L'exécutable `PhotoApp.exe` sera généré dans `PhotoApp/bin/Release/net10.0/win-x64/publish/`.
+### Exécuter les tests
 
-### Validation avec le build de distribution
+```powershell
+dotnet test .\PhotoApp.Tests\PhotoApp.Tests.csproj
+```
 
-Pour valider uniquement avec le vrai build de distribution, utiliser le script `run-published.ps1` à la racine du projet :
+### Publier l’exécutable Windows autonome
+
+```powershell
+dotnet publish .\PhotoApp\PhotoApp.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+```
+
+L’exécutable publié se trouve ici :
+
+```text
+PhotoApp\bin\Release\net10.0\win-x64\publish\PhotoApp.exe
+```
+
+### Script pratique de publication + lancement
+
+À la racine du dépôt :
 
 ```powershell
 .\run-published.ps1
 ```
 
-Ce script publie automatiquement en Release win-x64 self-contained single-file puis lance `PhotoApp.exe`.
+Ce script publie l’application en `Release win-x64 self-contained single-file`, puis lance l’exécutable publié.
 
-## Journalisation et diagnostic
+## Test manuel recommandé
 
-Dès les premiers jalons, l’application devra produire des logs lisibles. Les événements importants à tracer sont :
+Pour valider l’application sans risque :
 
-- démarrage et fin de scan ;
-- nombre de fichiers détectés ;
-- erreurs d’accès ;
-- décisions de résolution de date ;
-- opérations de compression ;
-- écritures de métadonnées.
+1. créer un dossier de test avec des copies d’images ;
+2. lancer l’exécutable publié ;
+3. choisir le dossier ;
+4. vérifier les dates retenues et les noms cibles ;
+5. lancer une première conversion **sans suppression des originaux** ;
+6. vérifier le contenu du dossier `Converted` ;
+7. refaire un second test avec suppression activée seulement après validation du résultat.
 
-Un journal texte local suffit en première version. L’objectif est de faciliter le diagnostic sans ajouter une stack d’observabilité excessive.
+## Décisions de conception actées
 
-## Décisions déjà prises
+- pas de backend, pas de cloud ;
+- application desktop locale uniquement ;
+- priorité Windows pour la v1 ;
+- exécutable autonome Windows comme livrable principal ;
+- pas d’ExifTool au runtime ;
+- séparation simple entre UI, core métier et tests ;
+- priorité à la lisibilité et à la sécurité des fichiers.
 
-Les choix actés à ce stade sont les suivants :
+## Règles de travail avec une IA de code
 
-| Sujet | Décision |
-|---|---|
-| Plateforme prioritaire | Windows |
-| Portabilité visée | Linux et macOS ensuite |
-| Langage / runtime | C# / .NET 10 LTS |
-| GUI | Avalonia |
-| IDE de départ | VS Code |
-| Type de distribution cible | `.exe` Windows autonome |
-| Style d’architecture | simple, pragmatique, testable |
+Chaque prompt destiné à une IA de code doit rappeler :
 
-Le projet Avalonia MVVM a déjà été créé et publié avec succès en `win-x64` self-contained single-file, ce qui valide le socle de départ pour la suite.[20][5][21]
+1. le contexte du projet ;
+2. l’état actuel réel de l’application ;
+3. la contrainte de packaging autonome ;
+4. la priorité à la sécurité des données ;
+5. l’objectif précis de la tâche demandée.
 
-## Roadmap courte
+Bloc recommandé à réutiliser dans les prompts :
 
-### Jalons immédiats
+```text
+Contexte projet:
+Application desktop locale Avalonia UI + .NET 10.
+Objectif: harmoniser des photos en local, hors ligne, avec packaging Windows autonome.
+Le projet doit rester portable vers Linux/macOS.
+Aucune dépendance runtime externe type ExifTool.
 
-1. créer `PhotoApp.Core` et `PhotoApp.Tests` ;
-2. implémenter un scanner récursif d’images ;
-3. brancher le scan à l’UI ;
-4. afficher les résultats dans la fenêtre principale ;
-5. ajouter la résolution de dates ;
-6. ajouter la prévisualisation de changements ;
-7. seulement après, ajouter la compression réelle.
-
-### Jalons suivants
-
-- gestion des doublons ;
-- cache local SQLite ;
-- miniatures persistées ;
-- file d’attente de jobs ;
-- annulation d’opérations longues ;
-- reporting plus complet des changements.
-
-## Règles de travail pour l’IA de code
-
-Quand une IA de code intervient sur le projet, elle doit respecter ces règles :
-
-- privilégier la simplicité et la lisibilité ;
-- ne pas introduire de dépendance externe sans justification claire ;
-- éviter les abstractions prématurées ;
-- ne pas mélanger logique UI et logique métier ;
-- proposer des modifications petites et testables ;
-- conserver les noms de classes explicites ;
-- gérer proprement les erreurs filesystem ;
-- écrire des tests sur les règles critiques ;
-- éviter de casser l’objectif de packaging autonome Windows.
-
-L’IA doit produire du code maintenable par un développeur humain seul, pas une architecture démonstrative.
-
-## Définition de “version 0 utile”
-
-La première version utile du projet n’a pas besoin d’être complète. Elle sera considérée comme satisfaisante si elle permet :
-
-- de choisir un dossier ;
-- de scanner récursivement les images ;
-- d’afficher la liste des résultats ;
-- de montrer les dates candidates ;
-- de proposer une date retenue avec sa source ;
-- de prévisualiser une harmonisation ;
-- de publier un exécutable Windows autonome.
-
-La compression avancée, le support parfait de tous les formats exotiques et l’optimisation poussée de la galerie peuvent venir après. Ce cadrage évite de diluer l’effort trop tôt.
-
-## Référence de démarrage
-
-Commandes utiles de base :
-
-```powershell
-dotnet new avalonia.mvvm -o PhotoApp
-cd .\PhotoApp
-dotnet run
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+État actuel de l'app:
+- sélection d’un dossier => scan automatique
+- affichage dans l’UI de:
+  - nom source
+  - chemin
+  - date retenue
+  - source de date
+  - nom cible proposé
+- bouton Convertir raccordé à l’UI
+- case "Effacer l’original après succès"
+- pipeline Core fonctionnel:
+  - RenamePlanner
+  - BatchRenameExecutor
+  - ImageConverter
+  - FileTimestampApplier
+- bug du fichier temporaire `.tmp` corrigé
+- publication Windows self-contained single-file validée
+- test réel validé avec l’exécutable publié
 ```
 
-Ces commandes correspondent au flux de création et de publication documenté pour Avalonia/.NET, et ont déjà été validées sur l’environnement Windows cible du projet.[20][5][21]
+## Résumé
+
+Le projet est maintenant à un stade où une **v1 réellement utile** existe sur Windows. Le cœur du flux utilisateur fonctionne, mais plusieurs améliorations importantes restent à faire avant d’avoir une application vraiment confortable et plus universelle, en particulier sur l’UX, la journalisation, les formats avancés et l’écriture de métadonnées internes.
