@@ -2088,20 +2088,19 @@ git commit -m "fix: le scan exclut le dossier de sortie, les dossiers cachés et
 
 ### Tâche 9 : Formats réellement convertibles (défaut 2)
 
-Décision de phase 0 : HEIC/HEIF/AVIF restent **listés** par le scanner mais **explicitement ignorés** avec un compteur, au lieu d'échouer (le décodage arrive en phase 5 avec Magick.NET). WebP est ajouté au convertisseur (ImageSharp le décode).
+Révisée après le passage à Magick.NET : HEIC, HEIF et AVIF sont **convertis** (décodeur libheif embarqué). Magick.NET 14.17.2 lit le HEIC mais ne sait pas l'écrire (pas d'encodeur x265) : les tests utilisent AVIF, qui passe par le même décodeur ; un vrai HEIC est vérifié à la main en tâche 11. GIF n'est **pas** converti (une animation serait réduite à sa première image). `.avif` est ajouté à `SupportedImageExtensions`.
 
 **Fichiers :**
-- Modifier : `PhotoApp.Operations/ImageConverter.cs`
+- Modifier : `PhotoApp.Operations/ImageConverter.cs`, `PhotoApp.Core/Services/SupportedImageExtensions.cs` (`.avif`)
 - Test : `PhotoApp.Tests/ImageConverterTests.cs`
 
 **Interfaces :**
-- Produit : `ImageConverter.CanConvert(string? extension) : bool` (statique) — vrai pour `.jpg .jpeg .png .bmp .gif .tif .tiff .webp` ; `ConvertToJpeg` inchangé sauf l'ajout de `.webp`.
+- Produit : `ImageConverter.CanConvert(string? extension) : bool` (statique) — vrai pour `.jpg .jpeg .png .bmp .tif .tiff .webp .heic .heif .avif`. `ConvertToJpeg` : JPEG copié octet pour octet ; autres formats décodés, orientés (`AutoOrient`), transparence remplacée par du blanc, profils EXIF/XMP/ICC conservés.
 
 - [ ] **Étape 1 : Tests qui échouent**
 
 ```csharp
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using ImageMagick;
 
 namespace PhotoApp.Tests;
 
@@ -2113,8 +2112,10 @@ public sealed class ImageConverterTests
     [InlineData(".png", true)]
     [InlineData(".webp", true)]
     [InlineData(".tif", true)]
-    [InlineData(".heic", false)]
-    [InlineData(".heif", false)]
+    [InlineData(".heic", true)]
+    [InlineData(".heif", true)]
+    [InlineData(".avif", true)]
+    [InlineData(".gif", false)]   // animation perdue : non converti
     [InlineData(".txt", false)]
     [InlineData(null, false)]
     public void CanConvert_ReflectsWhatConvertToJpegSupports(string? extension, bool expected)
@@ -2122,42 +2123,82 @@ public sealed class ImageConverterTests
         Assert.Equal(expected, ImageConverter.CanConvert(extension));
     }
 
-    [Fact]
-    public void ConvertToJpeg_Png_ProducesAReadableJpeg()
+    [Theory]
+    [InlineData("in.png", MagickFormat.Png)]
+    [InlineData("in.webp", MagickFormat.WebP)]
+    [InlineData("in.tif", MagickFormat.Tiff)]
+    [InlineData("in.avif", MagickFormat.Avif)]   // même décodeur (libheif) que HEIC, que Magick.NET ne sait pas écrire
+    public void ConvertToJpeg_ProducesAReadableJpeg(string inputName, MagickFormat inputFormat)
     {
         using var temp = new TempDirectory();
-        var input = temp.Combine("in.png");
+        var input = temp.Combine(inputName);
         var output = temp.Combine("out.jpg");
-        TestImages.WritePng(input);
+        TestImages.Write(input, inputFormat);
 
         new ImageConverter().ConvertToJpeg(input, output, 90);
 
-        var info = Image.Identify(output);
-        Assert.Equal(8, info.Width);
-        Assert.Equal("JPEG", info.Metadata.DecodedImageFormat?.Name);
+        var info = new MagickImageInfo(output);
+        Assert.Equal(MagickFormat.Jpeg, info.Format);
+        Assert.Equal(8u, info.Width);
     }
 
     [Fact]
-    public void ConvertToJpeg_Webp_ProducesAReadableJpeg()
+    public void ConvertToJpeg_KeepsTheExifDate()
     {
         using var temp = new TempDirectory();
         var input = temp.Combine("in.webp");
         var output = temp.Combine("out.jpg");
-        using (var image = new Image<Rgb24>(8, 8))
+        using (var image = new MagickImage(MagickColors.Gray, 8, 8))
         {
-            image.SaveAsWebp(input);
+            var exif = new ExifProfile();
+            exif.SetValue(ExifTag.DateTimeOriginal, "2023:03:04 13:20:15");
+            image.SetProfile(exif);
+            image.Write(input, MagickFormat.WebP);
         }
 
         new ImageConverter().ConvertToJpeg(input, output, 90);
 
-        Assert.Equal("JPEG", Image.Identify(output).Metadata.DecodedImageFormat?.Name);
+        var date = new NativeImageMetadataReader().Read(output);
+        Assert.NotNull(date);
+        Assert.Equal(new DateTime(2023, 3, 4, 13, 20, 15), date.WallClock);
     }
 
     [Fact]
-    public void ConvertToJpeg_Heic_ThrowsNotSupported()
+    public void ConvertToJpeg_TransparentPng_GetsAWhiteBackground()
     {
         using var temp = new TempDirectory();
-        var input = temp.Combine("in.heic");
+        var input = temp.Combine("in.png");
+        var output = temp.Combine("out.jpg");
+        using (var image = new MagickImage(MagickColors.Transparent, 8, 8))
+        {
+            image.Write(input, MagickFormat.Png);
+        }
+
+        new ImageConverter().ConvertToJpeg(input, output, 90);
+
+        using var result = new MagickImage(output);
+        var pixel = result.GetPixels().GetPixel(4, 4).ToColor()!;
+        Assert.True(pixel.R > 240 && pixel.G > 240 && pixel.B > 240, $"pixel attendu blanc, obtenu {pixel}");
+    }
+
+    [Fact]
+    public void ConvertToJpeg_JpegSource_IsCopiedByteForByte()
+    {
+        using var temp = new TempDirectory();
+        var input = temp.Combine("in.jpg");
+        var output = temp.Combine("out.jpg");
+        TestImages.WriteJpeg(input, "2023:03:04 13:20:15");
+
+        new ImageConverter().ConvertToJpeg(input, output, 50);
+
+        Assert.Equal(File.ReadAllBytes(input), File.ReadAllBytes(output));
+    }
+
+    [Fact]
+    public void ConvertToJpeg_UnsupportedExtension_ThrowsNotSupported()
+    {
+        using var temp = new TempDirectory();
+        var input = temp.Combine("in.gif");
         File.WriteAllBytes(input, [1, 2, 3]);
 
         Assert.Throws<NotSupportedException>(() => new ImageConverter().ConvertToJpeg(input, temp.Combine("out.jpg"), 90));
@@ -2165,13 +2206,12 @@ public sealed class ImageConverterTests
 }
 ```
 
-Run : `dotnet test PhotoApp.Tests --filter ImageConverterTests` — Attendu : ÉCHEC (`CanConvert` absent).
+Run : `dotnet build PhotoApp.Tests` — Attendu : ÉCHEC (`CanConvert` absent).
 
 - [ ] **Étape 2 : Implémenter** — remplacer `ImageConverter.cs` :
 
 ```csharp
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
+using ImageMagick;
 
 namespace PhotoApp.Operations;
 
@@ -2179,9 +2219,10 @@ public sealed class ImageConverter : IImageConverter
 {
     private static readonly HashSet<string> JpegExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg" };
 
+    // GIF est exclu : la conversion ne garderait que la première image d'une animation.
     private static readonly HashSet<string> DecodableExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".png", ".bmp", ".gif", ".tif", ".tiff", ".webp"
+        ".png", ".bmp", ".tif", ".tiff", ".webp", ".heic", ".heif", ".avif"
     };
 
     public static bool CanConvert(string? extension) =>
@@ -2195,30 +2236,42 @@ public sealed class ImageConverter : IImageConverter
         {
             // Déjà du JPEG : copie telle quelle pour conserver tous les octets et métadonnées.
             File.Copy(inputPath, outputPath, overwrite: true);
+            return;
         }
-        else if (DecodableExtensions.Contains(extension))
-        {
-            using var image = Image.Load(inputPath);
-            image.Save(outputPath, new JpegEncoder { Quality = quality });
-        }
-        else
+
+        if (!DecodableExtensions.Contains(extension))
         {
             throw new NotSupportedException($"Conversion from {extension} to JPEG is not supported.");
         }
+
+        // Magick.NET conserve les profils EXIF, XMP et ICC à l'écriture.
+        using var image = new MagickImage(inputPath);
+        image.AutoOrient();
+        if (image.HasAlpha)
+        {
+            // Le JPEG n'a pas de transparence : fond blanc plutôt que noir.
+            image.BackgroundColor = MagickColors.White;
+            image.Alpha(AlphaOption.Remove);
+        }
+
+        image.Quality = (uint)quality;
+        image.Write(outputPath, MagickFormat.Jpeg);
     }
 }
 ```
 
+Ajouter `".avif"` à la liste de `SupportedImageExtensions`.
+
 - [ ] **Étape 3 : Vérifier**
 
 Run : `dotnet test PhotoVisualizer.slnx`
-Attendu : tout passe. Si `SaveAsWebp` n'est pas résolu dans le test, ajouter `using SixLabors.ImageSharp.Formats.Webp;`.
+Attendu : tout passe.
 
 - [ ] **Étape 4 : Commit**
 
 ```bash
 git add -A
-git commit -m "fix: formats convertibles explicites (WebP ajouté, HEIC ignoré proprement)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "fix: HEIC/HEIF/AVIF/WebP convertis via Magick.NET, métadonnées conservées" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -2409,7 +2462,6 @@ public sealed class ConversionServiceTests
         TestImages.WritePng(Path.Combine(root, "IMG_20240410_111652.png"));                 // même seconde
         TestImages.WriteJpeg(Path.Combine(root, "holiday.jpg"), "2023:03:04 13:20:15");     // date EXIF
         TestImages.WritePng(Path.Combine(root, "no-date-at-all.png"));                       // date non fiable
-        File.WriteAllBytes(Path.Combine(root, "IMG_20240101_101010.heic"), [1, 2, 3]);       // format non pris en charge
 
         var service = new ConversionService();
 
@@ -2422,7 +2474,7 @@ public sealed class ConversionServiceTests
         Assert.Equal(3, first.Converted);
         Assert.Equal(0, first.Failed);
         Assert.Equal(1, first.SkippedUnreliableDate);
-        Assert.Equal(1, first.SkippedUnsupportedFormat);
+        Assert.Equal(0, first.SkippedUnsupportedFormat);
         Assert.Equal(
             ["IMG-20230304-132015.jpg", "IMG-20240410-111652-01.jpg", "IMG-20240410-111652.jpg"],
             filesAfterFirst);
@@ -3079,13 +3131,13 @@ Ne pas pousser. Demander à l'utilisateur s'il veut pousser `feat/phase0-fondati
 | Exigence de la spec | Tâche |
 |---|---|
 | Défaut 1 : scan inclut `Converted/` | 8 (+ test d'intégration 10) |
-| Défaut 2 : HEIC/HEIF/WebP rejetés | 9 (WebP converti ; HEIC/HEIF comptés « format non pris en charge », décodage reporté en phase 5) |
+| Défaut 2 : HEIC/HEIF/WebP rejetés | 9 (Magick.NET : HEIC, HEIF, AVIF, WebP convertis ; GIF exclu) |
 | Défaut 3 : heure EXIF marquée UTC, XMP converti en UTC | 4 |
 | Défaut 4 : `LastWriteTime` présenté comme fiable | 5 |
 | Défaut 5 : nettoyage avec nouveau `Guid` | 10 |
 | Défaut 6 : trous du parseur (captures Windows, 12 h, epoch, ambiguïté JJ/MM, Nextcloud iOS) | 6 (Nextcloud iOS déjà reconnu, test conservé) |
 | Défaut 7 : scan sur le thread UI | 11 |
-| Défaut 8 : ImageSharp vulnérable | 1 |
+| Défaut 8 : ImageSharp vulnérable | 1 (remplacé par Magick.NET) |
 | Défaut 9 : hash de collision sur le chemin | 7 |
 | Découpage en projets (§4), hors `Cli` | 2 (Cli → phase 1, indiqué plus haut) |
 | Racines de données centralisées (§9) | 3, utilisée en 11 |

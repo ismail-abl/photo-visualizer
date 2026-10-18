@@ -11,7 +11,8 @@ public static class SupportedImageExtensions
         ".heif",
         ".webp",
         ".tiff",
-        ".tif"
+        ".tif",
+        ".avif"
     };
 
     public static bool IsSupported(string? extension)
