@@ -1,6 +1,3 @@
-using System.IO;
-using System.Security.Cryptography;
-using System.Text;
 using PhotoApp.Core.Models;
 
 namespace PhotoApp.Core.Services;
@@ -8,52 +5,39 @@ namespace PhotoApp.Core.Services;
 public sealed class RenamePlanner
 {
     public IReadOnlyList<RenamePlan> PlanRenames(
-        IReadOnlyList<(string sourcePath, ImageDateCandidate date, string extension)> imageData,
-        string outputFolder)
+        IReadOnlyList<PlanInput> inputs,
+        IReadOnlyDictionary<string, PreviousOutput> previous,
+        IEnumerable<string> existingTargetNames,
+        string outputExtension = ".jpg")
     {
-        var plans = new List<RenamePlan>();
+        var allocator = new NameAllocator(existingTargetNames.Concat(previous.Values.Select(p => p.TargetName)));
+        var plans = new List<RenamePlan>(inputs.Count);
 
-        foreach (var (sourcePath, date, extension) in imageData)
+        // Ordre chronologique puis nom de fichier (le compteur WhatsApp WAnnnn en fait partie) : stable d'un passage à l'autre.
+        var ordered = inputs
+            .OrderBy(i => i.Date.WallClock)
+            .ThenBy(i => i.Date.HasTime)
+            .ThenBy(i => Path.GetFileName(i.SourcePath), StringComparer.Ordinal)
+            .ThenBy(i => i.SourcePath, StringComparer.Ordinal);
+
+        foreach (var input in ordered)
         {
-            var targetName = NormalizedFileNameBuilder.Build(date, extension, sourcePath);
-            var plan = new RenamePlan(sourcePath, targetName, date);
-            plans.Add(plan);
+            if (previous.TryGetValue(input.SourcePath, out var done) &&
+                done.SizeBytes == input.SizeBytes &&
+                done.LastWriteUtcTicks == input.LastWriteUtcTicks)
+            {
+                plans.Add(new RenamePlan(input.SourcePath, done.TargetName, input.Date, input.SizeBytes, input.LastWriteUtcTicks, AlreadyDone: true));
+                continue;
+            }
+
+            plans.Add(new RenamePlan(
+                input.SourcePath,
+                allocator.Allocate(input.Date, outputExtension),
+                input.Date,
+                input.SizeBytes,
+                input.LastWriteUtcTicks));
         }
 
-        // Handle collisions: group by target name
-        var groups = plans.GroupBy(p => p.TargetName).ToDictionary(g => g.Key, g => g.ToList());
-        var finalPlans = new List<RenamePlan>();
-
-        foreach (var group in groups)
-        {
-            if (group.Value.Count == 1)
-            {
-                finalPlans.Add(group.Value[0]);
-            }
-            else
-            {
-                // Collision: add hash to each
-                foreach (var plan in group.Value)
-                {
-                    var hash = GenerateShortHash(plan.SourcePath);
-                    var baseName = plan.Date.HasTime
-                        ? $"IMG-{plan.Date.WallClock:yyyyMMdd-HHmmss}"
-                        : $"IMG-{plan.Date.WallClock:yyyyMMdd}";
-                    var ext = Path.GetExtension(plan.TargetName).ToLowerInvariant();
-                    var newTargetName = $"{baseName}-{hash}{ext}";
-                    var newPlan = plan with { TargetName = newTargetName };
-                    finalPlans.Add(newPlan);
-                }
-            }
-        }
-
-        return finalPlans;
-    }
-
-    private static string GenerateShortHash(string input)
-    {
-        using var md5 = MD5.Create();
-        var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(input));
-        return BitConverter.ToString(hash).Replace("-", "").Substring(0, 6).ToLowerInvariant();
+        return plans;
     }
 }

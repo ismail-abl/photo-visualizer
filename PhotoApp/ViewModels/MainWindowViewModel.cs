@@ -131,12 +131,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
-            var imageData = new List<(string sourcePath, ImageDateCandidate date, string extension)>();
+            var imageData = new List<PlanInput>();
             foreach (var img in Images)
             {
-                if (img.DateMetadata?.RetainedCandidate is { } date)
+                if (img.DateMetadata is { IsReliable: true, RetainedCandidate: { } date })
                 {
-                    imageData.Add((img.FullPath, date, img.Extension));
+                    imageData.Add(new PlanInput(img.FullPath, date, img.FileSizeBytes, System.IO.File.GetLastWriteTimeUtc(img.FullPath).Ticks));
                 }
             }
 
@@ -149,7 +149,7 @@ public partial class MainWindowViewModel : ViewModelBase
             string outputFolder = System.IO.Path.Combine(SelectedFolderPath, "Converted");
             
             var planner = new PhotoApp.Core.Services.RenamePlanner();
-            var plans = planner.PlanRenames(imageData, outputFolder);
+            var plans = planner.PlanRenames(imageData, new Dictionary<string, PreviousOutput>(), []);
 
             var executor = new BatchRenameExecutor();
             

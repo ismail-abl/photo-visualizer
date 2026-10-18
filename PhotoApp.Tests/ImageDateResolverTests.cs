@@ -38,7 +38,7 @@ public sealed class ImageDateResolverTests
         Assert.Equal(new DateTime(2021, 10, 29, 0, 0, 0), result.FileNameCandidate?.WallClock);
         Assert.Equal(ImageDateSource.FileName, result.RetainedSource);
         Assert.False(result.RetainedDateHasTime);
-        Assert.Equal("IMG-20211029-58ebe3.jpg", result.NormalizedFileNamePreview);
+        Assert.Equal("IMG-20211029-000000-01.jpg", result.NormalizedFileNamePreview);
     }
 
     [Fact]

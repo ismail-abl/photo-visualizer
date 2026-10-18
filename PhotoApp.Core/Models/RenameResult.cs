@@ -4,4 +4,5 @@ public sealed record RenameResult(
     string SourcePath,
     string TargetPath,
     bool Success,
-    string? ErrorMessage = null);
+    string? ErrorMessage = null,
+    bool Skipped = false);

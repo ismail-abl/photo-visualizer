@@ -13,8 +13,8 @@ public sealed class BatchRenameExecutorTests
     {
         var plans = new List<RenamePlan>
         {
-            new("source1.jpg", "target1.jpg", Noon),
-            new("source2.jpg", "target2.jpg", Noon)
+            new("source1.jpg", "target1.jpg", Noon, 0, 0),
+            new("source2.jpg", "target2.jpg", Noon, 0, 0)
         };
         var outputFolder = "output";
         var executor = new BatchRenameExecutor(Mock.Of<IImageConverter>(), Mock.Of<IFileTimestampApplier>());
@@ -35,7 +35,7 @@ public sealed class BatchRenameExecutorTests
         {
             var sourcePath = Path.Combine(tempDir, "source.jpg");
             File.WriteAllText(sourcePath, "fake jpeg");
-            var plan = new RenamePlan(sourcePath, "target.jpg", Noon);
+            var plan = new RenamePlan(sourcePath, "target.jpg", Noon, 0, 0);
             var outputFolder = Path.Combine(tempDir, "output");
             var mockConverter = new Mock<IImageConverter>();
             mockConverter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>())).Callback<string, string, int>((input, output, q) => File.Copy(input, output));
@@ -64,7 +64,7 @@ public sealed class BatchRenameExecutorTests
         {
             var sourcePath = Path.Combine(tempDir, "source.png");
             File.WriteAllText(sourcePath, "fake png");
-            var plan = new RenamePlan(sourcePath, "target.jpg", Noon);
+            var plan = new RenamePlan(sourcePath, "target.jpg", Noon, 0, 0);
             var outputFolder = Path.Combine(tempDir, "output");
             var mockConverter = new Mock<IImageConverter>();
             mockConverter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>())).Callback<string, string, int>((input, output, q) =>
@@ -96,7 +96,7 @@ public sealed class BatchRenameExecutorTests
         {
             var sourcePath = Path.Combine(tempDir, "source.jpg");
             File.WriteAllText(sourcePath, "fake jpeg");
-            var plan = new RenamePlan(sourcePath, "target.jpg", Noon);
+            var plan = new RenamePlan(sourcePath, "target.jpg", Noon, 0, 0);
             var outputFolder = Path.Combine(tempDir, "output");
             var mockConverter = new Mock<IImageConverter>();
             mockConverter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>())).Callback<string, string, int>((input, output, q) => File.Copy(input, output));
@@ -124,7 +124,7 @@ public sealed class BatchRenameExecutorTests
         {
             var sourcePath = Path.Combine(tempDir, "source.jpg");
             File.WriteAllText(sourcePath, "fake jpeg");
-            var plan = new RenamePlan(sourcePath, "target.jpg", Noon);
+            var plan = new RenamePlan(sourcePath, "target.jpg", Noon, 0, 0);
             var outputFolder = Path.Combine(tempDir, "output");
             var mockConverter = new Mock<IImageConverter>();
             mockConverter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>())).Throws(new Exception("Conversion failed"));

@@ -34,7 +34,7 @@ public sealed class ImageDateResolver
 
         var preview = retained is null || !DateSelector.IsReliable(source)
             ? null
-            : NormalizedFileNameBuilder.Build(retained, Path.GetExtension(filePath), filePath);
+            : NormalizedFileNameBuilder.Preview(retained);
 
         return new ImageDateMetadata(native, fromName, fromFileSystem, retained, source, preview);
     }

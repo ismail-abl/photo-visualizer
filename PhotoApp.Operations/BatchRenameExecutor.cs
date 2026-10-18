@@ -28,7 +28,7 @@ public sealed class BatchRenameExecutor
         {
             var targetPath = Path.Combine(outputFolder, plan.TargetName);
             // Check if target exists
-            if (File.Exists(targetPath))
+            if (!plan.AlreadyDone && File.Exists(targetPath))
             {
                 results.Add(new RenameResult(plan.SourcePath, targetPath, false, "Target file already exists"));
             }
