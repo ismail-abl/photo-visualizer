@@ -25,7 +25,7 @@
 
 ## Hors phase 0 (explicite)
 
-Projet `PhotoApp.Cli` (phase 1), profils de sources et confrontation de candidats (phase 1), écriture ExifTool (phase 3), règles fines de conversion — qualité réglable, « ignorer si plus lourd », profil ICC Display P3 vérifié (phase 5), journal/annulation/quarantaine (phase 2). La suppression de l'original (`DeleteOriginalAfterSuccess`) reste telle quelle jusqu'à la phase 2.
+Projet `PhotoApp.Cli` (phase 1), profils de sources et confrontation de candidats (phase 1), écriture ExifTool (phase 3), règles fines de conversion — qualité réglable, « ignorer si plus lourd » (sauf HEIC/HEIF, toujours convertis pour la compatibilité), profil ICC Display P3 vérifié (phase 5), journal/annulation/quarantaine (phase 2). La suppression de l'original (`DeleteOriginalAfterSuccess`) reste telle quelle jusqu'à la phase 2.
 
 ## Écarts assumés par rapport à la spec
 
