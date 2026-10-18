@@ -44,7 +44,7 @@ public partial class MainWindow : Window
 
         if (DataContext is MainWindowViewModel viewModel)
         {
-            viewModel.SetSelectedFolderAndScan(selectedPath);
+            await viewModel.SetSelectedFolderAndScanAsync(selectedPath);
         }
     }
 }

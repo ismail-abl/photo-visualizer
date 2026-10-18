@@ -1,11 +1,14 @@
 ﻿using System;
-using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PhotoApp.Catalog;
+using PhotoApp.Core;
 using PhotoApp.Core.Models;
-using PhotoApp.Core.Services;
 using PhotoApp.Metadata;
 using PhotoApp.Operations;
 
@@ -13,8 +16,13 @@ namespace PhotoApp.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    private const string OutputFolderName = "Converted";
+    private const int JpegQuality = 90;
+
     private readonly ImageScanner _imageScanner = new();
     private readonly ImageDateResolver _imageDateResolver = new();
+    private readonly ConversionService _conversionService = new();
+    private readonly AppDataPaths _dataPaths = AppDataPaths.ForCurrentUser();
 
     [ObservableProperty]
     private string? _selectedFolderPath;
@@ -45,142 +53,106 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool CanConvertNow => !IsScanning && !IsConverting && Images.Count > 0 && !string.IsNullOrWhiteSpace(SelectedFolderPath);
 
-    private void ScanSelectedFolder()
+    public async Task SetSelectedFolderAndScanAsync(string selectedFolderPath)
     {
-        if (string.IsNullOrWhiteSpace(SelectedFolderPath))
+        SelectedFolderPath = selectedFolderPath;
+        await ScanSelectedFolderAsync();
+    }
+
+    private async Task ScanSelectedFolderAsync()
+    {
+        var root = SelectedFolderPath;
+        if (string.IsNullOrWhiteSpace(root))
         {
             return;
         }
 
         IsScanning = true;
-        OnPropertyChanged(nameof(CanConvertNow));
-        ConvertCommand.NotifyCanExecuteChanged();
         ConversionStatus = string.Empty;
         try
         {
-            var scannedImages = _imageScanner.Scan(SelectedFolderPath);
-            var sortedImages = new List<ImageFileInfo>(scannedImages);
-            sortedImages.Sort(static (left, right) =>
-                string.Compare(left.FileName, right.FileName, StringComparison.OrdinalIgnoreCase));
+            // Scan et lecture des métadonnées hors du thread de l'interface.
+            var resolved = await Task.Run(() => ScanAndResolve(root));
 
             Images.Clear();
-            for (var i = 0; i < sortedImages.Count; i++)
+            foreach (var image in resolved)
             {
-                var image = sortedImages[i];
-                var metadata = _imageDateResolver.Resolve(image.FullPath);
-
-                Images.Add(new ImageFileInfo(
-                    image.FullPath,
-                    image.FileName,
-                    image.Extension,
-                    image.FileSizeBytes,
-                    metadata));
+                Images.Add(image);
             }
 
             ImageCount = Images.Count;
         }
+        catch (Exception ex)
+        {
+            ConversionStatus = $"Erreur pendant l'analyse : {ex.Message}";
+        }
         finally
         {
             IsScanning = false;
-            OnPropertyChanged(nameof(CanConvertNow));
-            ConvertCommand.NotifyCanExecuteChanged();
         }
     }
 
-    public void SetSelectedFolderAndScan(string selectedFolderPath)
+    private List<ImageFileInfo> ScanAndResolve(string root)
     {
-        SelectedFolderPath = selectedFolderPath;
-        ScanSelectedFolder();
+        var outputFolder = Path.Combine(root, OutputFolderName);
+        var scanned = _imageScanner.Scan(root, new ScanOptions([outputFolder]));
+        var resolved = new ImageFileInfo[scanned.Count];
+
+        Parallel.For(0, scanned.Count, index =>
+        {
+            var image = scanned[index];
+            resolved[index] = new ImageFileInfo(
+                image.FullPath,
+                image.FileName,
+                image.Extension,
+                image.FileSizeBytes,
+                _imageDateResolver.Resolve(image.FullPath));
+        });
+
+        return resolved.OrderBy(image => image.FileName, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    partial void OnSelectedFolderPathChanged(string? value)
-    {
-        OnPropertyChanged(nameof(CanConvertNow));
-        ConvertCommand.NotifyCanExecuteChanged();
-    }
+    partial void OnSelectedFolderPathChanged(string? value) => RefreshCommandState();
 
-    partial void OnIsScanningChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanConvertNow));
-        ConvertCommand.NotifyCanExecuteChanged();
-    }
+    partial void OnIsScanningChanged(bool value) => RefreshCommandState();
+
+    partial void OnIsConvertingChanged(bool value) => RefreshCommandState();
 
     partial void OnImageCountChanged(int value)
     {
         OnPropertyChanged(nameof(HasNoImages));
-        OnPropertyChanged(nameof(CanConvertNow));
-        ConvertCommand.NotifyCanExecuteChanged();
+        RefreshCommandState();
     }
 
-    partial void OnIsConvertingChanged(bool value)
+    private void RefreshCommandState()
     {
         OnPropertyChanged(nameof(CanConvertNow));
         ConvertCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanConvertNow))]
-    private async System.Threading.Tasks.Task ConvertAsync()
+    private async Task ConvertAsync()
     {
         if (Images.Count == 0 || string.IsNullOrWhiteSpace(SelectedFolderPath))
         {
             return;
         }
 
+        var outputFolder = Path.Combine(SelectedFolderPath, OutputFolderName);
+        var manifestPath = _dataPaths.ManifestPathFor(outputFolder);
+        var snapshot = Images.ToList();
+        var deleteOriginals = DeleteOriginalAfterSuccess;
+
         IsConverting = true;
         ConversionStatus = "Conversion en cours...";
 
         try
         {
-            var imageData = new List<PlanInput>();
-            foreach (var img in Images)
-            {
-                if (img.DateMetadata is { IsReliable: true, RetainedCandidate: { } date })
-                {
-                    imageData.Add(new PlanInput(img.FullPath, date, img.FileSizeBytes, System.IO.File.GetLastWriteTimeUtc(img.FullPath).Ticks));
-                }
-            }
-
-            if (imageData.Count == 0)
-            {
-                ConversionStatus = "Aucune image avec date valide à convertir.";
-                return;
-            }
-
-            string outputFolder = System.IO.Path.Combine(SelectedFolderPath, "Converted");
-            
-            var planner = new PhotoApp.Core.Services.RenamePlanner();
-            var plans = planner.PlanRenames(imageData, new Dictionary<string, PreviousOutput>(), []);
-
-            var executor = new BatchRenameExecutor();
-            
-            // Execute in background
-            var results = await System.Threading.Tasks.Task.Run(() => 
-                executor.Execute(plans, outputFolder, 90, DeleteOriginalAfterSuccess));
-
-            int successCount = 0;
-            int failCount = 0;
-            string? firstError = null;
-
-            foreach (var r in results)
-            {
-                if (r.Success) successCount++;
-                else
-                {
-                    failCount++;
-                    firstError ??= r.ErrorMessage;
-                }
-            }
-
-            if (failCount == 0)
-            {
-                ConversionStatus = $"Succès : {successCount} fichier(s) converti(s).";
-            }
-            else
-            {
-                ConversionStatus = $"Terminé avec erreurs. Succès: {successCount}, Échecs: {failCount}. Erreur: {firstError}";
-            }
+            var summary = await Task.Run(() =>
+                _conversionService.Run(snapshot, outputFolder, manifestPath, JpegQuality, deleteOriginals));
+            ConversionStatus = summary.ToDisplayText();
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             ConversionStatus = $"Erreur critique: {ex.Message}";
         }
