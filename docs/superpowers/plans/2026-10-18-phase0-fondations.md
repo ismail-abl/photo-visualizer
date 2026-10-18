@@ -2466,10 +2466,10 @@ public sealed class ConversionServiceTests
         var service = new ConversionService();
 
         var first = service.Run(ScanAndResolve(root, output), output, manifestPath, 90, false);
-        var filesAfterFirst = Directory.GetFiles(output).Select(Path.GetFileName).Order().ToArray();
+        var filesAfterFirst = Directory.GetFiles(output).Select(path => Path.GetFileName(path)).Order(StringComparer.Ordinal).ToArray();
 
         var second = service.Run(ScanAndResolve(root, output), output, manifestPath, 90, false);
-        var filesAfterSecond = Directory.GetFiles(output).Select(Path.GetFileName).Order().ToArray();
+        var filesAfterSecond = Directory.GetFiles(output).Select(path => Path.GetFileName(path)).Order(StringComparer.Ordinal).ToArray();
 
         Assert.Equal(3, first.Converted);
         Assert.Equal(0, first.Failed);
@@ -2673,7 +2673,7 @@ public sealed class BatchRenameExecutor
         // Les chemins de travail sont calculés une seule fois : le nettoyage vise exactement ce qui a été créé.
         // Le préfixe ".work-" les rend invisibles au scanner.
         var workStem = Path.Combine(outputFolder, $".work-{Guid.NewGuid():N}");
-        var workSource = workStem + Path.GetExtension(plan.SourcePath);
+        var workSource = workStem + ".source" + Path.GetExtension(plan.SourcePath);   // distinct de workJpeg même pour une source .jpg
         var workJpeg = workStem + ".jpg";
 
         try

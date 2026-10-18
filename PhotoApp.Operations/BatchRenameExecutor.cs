@@ -1,4 +1,3 @@
-using System.IO;
 using PhotoApp.Core.Models;
 
 namespace PhotoApp.Operations;
@@ -27,79 +26,98 @@ public sealed class BatchRenameExecutor
         foreach (var plan in plans)
         {
             var targetPath = Path.Combine(outputFolder, plan.TargetName);
-            // Check if target exists
             if (!plan.AlreadyDone && File.Exists(targetPath))
             {
                 results.Add(new RenameResult(plan.SourcePath, targetPath, false, "Target file already exists"));
             }
             else
             {
-                results.Add(new RenameResult(plan.SourcePath, targetPath, true));
+                results.Add(new RenameResult(plan.SourcePath, targetPath, true, Skipped: plan.AlreadyDone));
             }
         }
 
         return results;
     }
 
-    public IReadOnlyList<RenameResult> Execute(IReadOnlyList<RenamePlan> plans, string outputFolder, int jpegQuality, bool deleteOriginals)
+    public IReadOnlyList<RenameResult> Execute(
+        IReadOnlyList<RenamePlan> plans,
+        string outputFolder,
+        int jpegQuality,
+        bool deleteOriginals,
+        ProcessedManifest? manifest = null)
     {
         var results = new List<RenameResult>();
         Directory.CreateDirectory(outputFolder);
 
         foreach (var plan in plans)
         {
-            var result = ExecuteSingle(plan, outputFolder, jpegQuality, deleteOriginals);
-            results.Add(result);
+            results.Add(ExecuteSingle(plan, outputFolder, jpegQuality, deleteOriginals, manifest));
         }
 
         return results;
     }
 
-    private RenameResult ExecuteSingle(RenamePlan plan, string outputFolder, int jpegQuality, bool deleteOriginal)
+    private RenameResult ExecuteSingle(RenamePlan plan, string outputFolder, int jpegQuality, bool deleteOriginal, ProcessedManifest? manifest)
     {
         var targetPath = Path.Combine(outputFolder, plan.TargetName);
-        var sourceExtension = Path.GetExtension(plan.SourcePath);
-        var tempPath = Path.Combine(outputFolder, $"{Guid.NewGuid()}{sourceExtension}");
+        if (plan.AlreadyDone)
+        {
+            return new RenameResult(plan.SourcePath, targetPath, true, Skipped: true);
+        }
+
+        // Les chemins de travail sont calculés une seule fois : le nettoyage vise exactement ce qui a été créé.
+        // Le préfixe ".work-" les rend invisibles au scanner.
+        var workStem = Path.Combine(outputFolder, $".work-{Guid.NewGuid():N}");
+        var workSource = workStem + ".source" + Path.GetExtension(plan.SourcePath);   // distinct de workJpeg même pour une source .jpg
+        var workJpeg = workStem + ".jpg";
 
         try
         {
-            // 1. Copy source to temp file
-            File.Copy(plan.SourcePath, tempPath, overwrite: false);
-
-            // 2. Convert to JPEG
-            var jpegPath = Path.Combine(outputFolder, $"{Guid.NewGuid()}.jpg");
-            _imageConverter.ConvertToJpeg(tempPath, jpegPath, jpegQuality);
-
-            // Clean up temp
-            File.Delete(tempPath);
-
-            // 3. Apply timestamps
-            _timestampApplier.ApplyTimestamps(jpegPath, plan.Date.ToInstant(TimeZoneInfo.Local));
-
-            // 4. Rename to final target
-            File.Move(jpegPath, targetPath, overwrite: false);
-
-            // 5. Optionally delete original
-            if (deleteOriginal)
-            {
-                File.Delete(plan.SourcePath);
-            }
-
-            return new RenameResult(plan.SourcePath, targetPath, true);
+            File.Copy(plan.SourcePath, workSource, overwrite: false);
+            _imageConverter.ConvertToJpeg(workSource, workJpeg, jpegQuality);
+            _timestampApplier.ApplyTimestamps(workJpeg, plan.Date.ToInstant(TimeZoneInfo.Local));
+            File.Move(workJpeg, targetPath, overwrite: false);
         }
         catch (Exception ex)
         {
-            // Clean up temp files on failure
-            if (File.Exists(tempPath))
-            {
-                File.Delete(tempPath);
-            }
-            var jpegPath = Path.Combine(outputFolder, $"{Guid.NewGuid()}.jpg");
-            if (File.Exists(jpegPath))
-            {
-                File.Delete(jpegPath);
-            }
             return new RenameResult(plan.SourcePath, targetPath, false, ex.Message);
+        }
+        finally
+        {
+            DeleteIfExists(workSource);
+            DeleteIfExists(workJpeg);
+        }
+
+        manifest?.Record(new ManifestEntry(plan.SourcePath, plan.SizeBytes, plan.LastWriteUtcTicks, plan.TargetName));
+
+        if (!deleteOriginal)
+        {
+            return new RenameResult(plan.SourcePath, targetPath, true);
+        }
+
+        try
+        {
+            File.Delete(plan.SourcePath);
+            return new RenameResult(plan.SourcePath, targetPath, true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new RenameResult(plan.SourcePath, targetPath, true, $"Original non supprimé : {ex.Message}");
+        }
+    }
+
+    private static void DeleteIfExists(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Nettoyage au mieux : ne doit jamais masquer l'erreur d'origine.
         }
     }
 }

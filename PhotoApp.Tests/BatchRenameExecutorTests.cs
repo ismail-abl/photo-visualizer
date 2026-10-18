@@ -143,4 +143,79 @@ public sealed class BatchRenameExecutorTests
             Directory.Delete(tempDir, true);
         }
     }
+
+    [Fact]
+    public void Execute_WhenConversionFailsAfterWritingOutput_LeavesNoOrphanFiles()
+    {
+        using var temp = new TempDirectory();
+        var source = temp.Combine("source.png");
+        File.WriteAllText(source, "x");
+        var output = temp.Combine("output");
+        var converter = new Mock<IImageConverter>();
+        converter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
+            .Callback<string, string, int>((_, target, _) =>
+            {
+                File.WriteAllText(target, "partial");
+                throw new IOException("boom");
+            });
+        var executor = new BatchRenameExecutor(converter.Object, Mock.Of<IFileTimestampApplier>());
+
+        var results = executor.Execute([new RenamePlan(source, "t.jpg", Noon, 1, 1)], output, 80, false);
+
+        Assert.False(results[0].Success);
+        Assert.Empty(Directory.GetFiles(output));
+        Assert.True(File.Exists(source));
+    }
+
+    [Fact]
+    public void Execute_WhenTimestampApplierFails_LeavesNoOrphanFiles()
+    {
+        using var temp = new TempDirectory();
+        var source = temp.Combine("source.jpg");
+        File.WriteAllText(source, "x");
+        var output = temp.Combine("output");
+        var converter = new Mock<IImageConverter>();
+        converter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
+            .Callback<string, string, int>((input, target, _) => File.Copy(input, target));
+        var applier = new Mock<IFileTimestampApplier>();
+        applier.Setup(a => a.ApplyTimestamps(It.IsAny<string>(), It.IsAny<DateTimeOffset>())).Throws(new IOException("locked"));
+        var executor = new BatchRenameExecutor(converter.Object, applier.Object);
+
+        var results = executor.Execute([new RenamePlan(source, "t.jpg", Noon, 1, 1)], output, 80, false);
+
+        Assert.False(results[0].Success);
+        Assert.Empty(Directory.GetFiles(output));
+    }
+
+    [Fact]
+    public void Execute_AlreadyDonePlan_IsSkippedWithoutTouchingAnything()
+    {
+        using var temp = new TempDirectory();
+        var output = temp.Combine("output");
+        var converter = new Mock<IImageConverter>(MockBehavior.Strict);
+        var executor = new BatchRenameExecutor(converter.Object, Mock.Of<IFileTimestampApplier>());
+
+        var results = executor.Execute([new RenamePlan("/p/a.png", "t.jpg", Noon, 1, 1, AlreadyDone: true)], output, 80, true);
+
+        Assert.True(results[0].Success);
+        Assert.True(results[0].Skipped);
+    }
+
+    [Fact]
+    public void Execute_Success_RecordsTheSourceInTheManifest()
+    {
+        using var temp = new TempDirectory();
+        var source = temp.Combine("source.jpg");
+        File.WriteAllText(source, "x");
+        var output = temp.Combine("output");
+        var converter = new Mock<IImageConverter>();
+        converter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
+            .Callback<string, string, int>((input, target, _) => File.Copy(input, target));
+        var manifest = ProcessedManifest.Empty();
+        var executor = new BatchRenameExecutor(converter.Object, Mock.Of<IFileTimestampApplier>());
+
+        executor.Execute([new RenamePlan(source, "t.jpg", Noon, 7, 9)], output, 80, false, manifest);
+
+        Assert.Equal(new PreviousOutput(7, 9, "t.jpg"), manifest.ToPrevious()[source]);
+    }
 }
