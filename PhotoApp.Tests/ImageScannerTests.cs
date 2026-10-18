@@ -58,4 +58,44 @@ public sealed class ImageScannerTests
             }
         }
     }
+
+    [Fact]
+    public void Scan_SkipsExcludedFolderAndItsDescendants()
+    {
+        using var temp = new TempDirectory();
+        Directory.CreateDirectory(temp.Combine("Converted", "sub"));
+        File.WriteAllBytes(temp.Combine("keep.jpg"), [1]);
+        File.WriteAllBytes(temp.Combine("Converted", "out.jpg"), [1]);
+        File.WriteAllBytes(temp.Combine("Converted", "sub", "deep.jpg"), [1]);
+
+        var result = new ImageScanner().Scan(temp.FullPath, new ScanOptions([temp.Combine("Converted")]));
+
+        Assert.Equal(["keep.jpg"], result.Select(i => i.FileName));
+    }
+
+    [Fact]
+    public void Scan_SkipsDotFoldersAndZeroByteFiles()
+    {
+        using var temp = new TempDirectory();
+        Directory.CreateDirectory(temp.Combine(".gs"));
+        File.WriteAllBytes(temp.Combine(".gs", "cache.jpg"), [1]);
+        File.WriteAllBytes(temp.Combine("empty.jpg"), []);
+        File.WriteAllBytes(temp.Combine("ok.jpg"), [1]);
+
+        var result = new ImageScanner().Scan(temp.FullPath);
+
+        Assert.Equal(["ok.jpg"], result.Select(i => i.FileName));
+    }
+
+    [Fact]
+    public void Scan_SkipsTemporaryWorkFiles()
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllBytes(temp.Combine(".work-abc.jpg"), [1]);
+        File.WriteAllBytes(temp.Combine("ok.jpg"), [1]);
+
+        var result = new ImageScanner().Scan(temp.FullPath);
+
+        Assert.Equal(["ok.jpg"], result.Select(i => i.FileName));
+    }
 }

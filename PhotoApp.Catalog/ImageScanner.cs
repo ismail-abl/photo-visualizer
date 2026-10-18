@@ -5,7 +5,7 @@ namespace PhotoApp.Catalog;
 
 public sealed class ImageScanner
 {
-    public IReadOnlyList<ImageFileInfo> Scan(string rootPath)
+    public IReadOnlyList<ImageFileInfo> Scan(string rootPath, ScanOptions? options = null)
     {
         if (string.IsNullOrWhiteSpace(rootPath))
         {
@@ -19,6 +19,11 @@ public sealed class ImageScanner
             return images;
         }
 
+        var comparer = OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
+        var excluded = new HashSet<string>(
+            (options?.ExcludedFolders ?? []).Select(NormalizeFolder),
+            comparer);
+
         var directoriesToScan = new Stack<string>();
         directoriesToScan.Push(rootPath);
 
@@ -28,19 +33,24 @@ public sealed class ImageScanner
 
             foreach (var subDirectory in EnumerateDirectoriesSafe(currentDirectory))
             {
+                if (excluded.Contains(NormalizeFolder(subDirectory)) || IsHidden(subDirectory))
+                {
+                    continue;
+                }
+
                 directoriesToScan.Push(subDirectory);
             }
 
             foreach (var filePath in EnumerateFilesSafe(currentDirectory))
             {
                 var extension = Path.GetExtension(filePath);
-                if (!SupportedImageExtensions.IsSupported(extension))
+                if (!SupportedImageExtensions.IsSupported(extension) || IsHidden(filePath))
                 {
                     continue;
                 }
 
                 var imageInfo = CreateImageFileInfo(filePath);
-                if (imageInfo is not null)
+                if (imageInfo is { FileSizeBytes: > 0 })
                 {
                     images.Add(imageInfo);
                 }
@@ -48,6 +58,27 @@ public sealed class ImageScanner
         }
 
         return images;
+    }
+
+    private static string NormalizeFolder(string path) =>
+        Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+    // Dossiers et fichiers cachés : caches d'applications (.gs), fichiers de travail (.work-…), corbeilles système.
+    private static bool IsHidden(string path)
+    {
+        if (Path.GetFileName(path).StartsWith('.'))
+        {
+            return true;
+        }
+
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.Hidden) != 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
     }
 
     private static IEnumerable<string> EnumerateDirectoriesSafe(string directoryPath)
