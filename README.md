@@ -25,7 +25,7 @@ Application desktop locale, hors ligne, pour normaliser les dates et les noms de
 - Pas encore d'écriture des métadonnées internes (phase 3, ExifTool embarqué) : la date est appliquée aux dates du fichier de sortie.
 - Une heure EXIF sans décalage est interprétée dans le fuseau du PC ; le décalage horaire par lot (ex. photos de voyage) arrive en phase 3.
 - L'empreinte d'idempotence est la taille + la date de modification de la source ; le SHA-256 arrive avec les doublons (phase 5).
-- Une conversion HEIC → JPEG produit souvent un fichier plus lourd : c'est voulu, la compatibilité prime. La règle « ignorer si plus lourd » (phase 5) ne s'appliquera pas à HEIC/HEIF.
+- Une conversion HEIC ou AVIF → JPEG produit souvent un fichier plus lourd : c'est voulu, la compatibilité prime. La règle « ignorer si plus lourd » (phase 5) ne s’appliquera pas à HEIC/HEIF/AVIF.
 - Pas encore de galerie, de journal, d'annulation ni de quarantaine (phases 2 et 4). L'option « Effacer l'original après succès » supprime réellement l'original : la laisser décochée pour tout essai.
 
 ## Architecture
