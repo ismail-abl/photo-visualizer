@@ -30,13 +30,9 @@ public sealed class ImageDateResolver
         var fromName = _fileNameDateParser.Parse(Path.GetFileNameWithoutExtension(filePath));
         var fromFileSystem = _fileSystemDateReader.Read(filePath);
 
-        var retained = native ?? fromName ?? fromFileSystem;
-        var source = native is not null ? ImageDateSource.NativeMetadata
-            : fromName is not null ? ImageDateSource.FileName
-            : fromFileSystem is not null ? ImageDateSource.FileSystem
-            : ImageDateSource.None;
+        var (retained, source) = DateSelector.Select(native, fromName, fromFileSystem, DateTime.UtcNow);
 
-        var preview = retained is null
+        var preview = retained is null || !DateSelector.IsReliable(source)
             ? null
             : NormalizedFileNameBuilder.Build(retained, Path.GetExtension(filePath), filePath);
 

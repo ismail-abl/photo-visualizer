@@ -56,7 +56,8 @@ public sealed class ImageDateResolverTests
         Assert.Equal(new DateTime(2026, 5, 4, 18, 19, 20), result.FileSystemCandidate?.WallClock);
         Assert.Equal(ImageDateSource.FileSystem, result.RetainedSource);
         Assert.True(result.RetainedDateHasTime);
-        Assert.Equal("IMG-20260504-181920.jpg", result.NormalizedFileNamePreview);
+        Assert.Null(result.NormalizedFileNamePreview);
+        Assert.False(result.IsReliable);
     }
 
     private sealed class StubNativeImageMetadataReader : NativeImageMetadataReader

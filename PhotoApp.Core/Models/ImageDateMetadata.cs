@@ -1,4 +1,5 @@
 using System.Globalization;
+using PhotoApp.Core.Services;
 
 namespace PhotoApp.Core.Models;
 
@@ -33,6 +34,15 @@ public sealed class ImageDateMetadata
     public bool RetainedDateHasTime => RetainedCandidate?.HasTime ?? false;
 
     public string? NormalizedFileNamePreview { get; }
+
+    public bool IsReliable => DateSelector.IsReliable(RetainedSource);
+
+    public string StatusText => RetainedSource switch
+    {
+        ImageDateSource.None => "À vérifier : aucune date trouvée",
+        ImageDateSource.FileSystem => "À vérifier : date non fiable (date du fichier), non appliquée",
+        _ => string.Empty
+    };
 
     public string RetainedDateText => RetainedCandidate is { } retained
         ? retained.WallClock.ToString(retained.HasTime ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd", CultureInfo.InvariantCulture)

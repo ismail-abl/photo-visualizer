@@ -62,6 +62,7 @@
                             <TextBlock Text="{Binding RetainedDateText, StringFormat='Date retenue: {0}'}" />
                             <TextBlock Text="{Binding RetainedDateSourceText, StringFormat='Source: {0}'}" Opacity="0.8" FontSize="12" />
                             <TextBlock Text="{Binding NormalizedFileNamePreview, StringFormat='Nom cible: {0}'}" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{Binding StatusText}" IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Foreground="DarkOrange" FontSize="12" />
                         </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>

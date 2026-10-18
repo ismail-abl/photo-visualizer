@@ -31,4 +31,6 @@ public sealed class ImageFileInfo
     public string RetainedDateSourceText => DateMetadata?.RetainedSourceText ?? "Aucune";
 
     public string? NormalizedFileNamePreview => DateMetadata?.NormalizedFileNamePreview;
+
+    public string StatusText => DateMetadata?.StatusText ?? string.Empty;
 }
