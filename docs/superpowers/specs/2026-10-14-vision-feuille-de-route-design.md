@@ -234,6 +234,7 @@ Les Motion Photos Samsung et Google contiennent leur vidéo dans le fichier imag
 - Copie de toutes les métadonnées, de l'orientation et du profil couleur ICC (Display P3).
 - Décodage via Magick.NET (HEIC, AVIF, RAW).
 - Conversion ignorée si le résultat serait plus lourd que la source. **Exception : HEIC, HEIF et AVIF sont toujours convertis**, même si le JPEG est plus lourd, pour la compatibilité (décision du 2026-10-18).
+- **Format cible réglable (à faire, phase 5)** : un réglage choisit la sortie, **JPEG** (par défaut, seul format actuel) ou **AVIF**. Dans les deux cas, HEIC et HEIF sont toujours convertis : on quitte un format sous brevets (HEVC) pour un format ouvert (JPEG, AVIF libre de redevances). Cible JPEG : les AVIF sont eux aussi convertis en JPEG (comportement actuel). Cible AVIF : les AVIF sources sont conservés tels quels (à confirmer à la spec de phase 5).
 - Captures PNG exclues par défaut (forçable).
 - Les vidéos ne sont pas converties.
 - L'original part en quarantaine après vérification, jamais en suppression directe.
