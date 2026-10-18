@@ -8,15 +8,15 @@ namespace PhotoApp.Core.Services;
 public sealed class RenamePlanner
 {
     public IReadOnlyList<RenamePlan> PlanRenames(
-        IReadOnlyList<(string sourcePath, DateTimeOffset retainedDate, bool hasTime, string extension)> imageData,
+        IReadOnlyList<(string sourcePath, ImageDateCandidate date, string extension)> imageData,
         string outputFolder)
     {
         var plans = new List<RenamePlan>();
 
-        foreach (var (sourcePath, retainedDate, hasTime, extension) in imageData)
+        foreach (var (sourcePath, date, extension) in imageData)
         {
-            var targetName = NormalizedFileNameBuilder.Build(retainedDate, hasTime, extension, sourcePath);
-            var plan = new RenamePlan(sourcePath, targetName, retainedDate, hasTime);
+            var targetName = NormalizedFileNameBuilder.Build(date, extension, sourcePath);
+            var plan = new RenamePlan(sourcePath, targetName, date);
             plans.Add(plan);
         }
 
@@ -36,9 +36,9 @@ public sealed class RenamePlanner
                 foreach (var plan in group.Value)
                 {
                     var hash = GenerateShortHash(plan.SourcePath);
-                    var baseName = plan.HasTime
-                        ? $"IMG-{plan.RetainedDate.DateTime:yyyyMMdd-HHmmss}"
-                        : $"IMG-{plan.RetainedDate.DateTime:yyyyMMdd}";
+                    var baseName = plan.Date.HasTime
+                        ? $"IMG-{plan.Date.WallClock:yyyyMMdd-HHmmss}"
+                        : $"IMG-{plan.Date.WallClock:yyyyMMdd}";
                     var ext = Path.GetExtension(plan.TargetName).ToLowerInvariant();
                     var newTargetName = $"{baseName}-{hash}{ext}";
                     var newPlan = plan with { TargetName = newTargetName };

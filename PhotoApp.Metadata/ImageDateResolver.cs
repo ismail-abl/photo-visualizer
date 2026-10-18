@@ -26,32 +26,20 @@ public sealed class ImageDateResolver
 
     public ImageDateMetadata Resolve(string filePath)
     {
-        var nativeMetadataCandidate = _nativeImageMetadataReader.Read(filePath);
-        var fileNameCandidate = _fileNameDateParser.Parse(Path.GetFileNameWithoutExtension(filePath));
-        var fileSystemCandidate = _fileSystemDateReader.Read(filePath);
+        var native = _nativeImageMetadataReader.Read(filePath);
+        var fromName = _fileNameDateParser.Parse(Path.GetFileNameWithoutExtension(filePath));
+        var fromFileSystem = _fileSystemDateReader.Read(filePath);
 
-        var retained = nativeMetadataCandidate ?? fileNameCandidate ?? fileSystemCandidate;
-        var retainedSource = retained is null
-            ? ImageDateSource.None
-            : retained == nativeMetadataCandidate
-            ? ImageDateSource.NativeMetadata
-            : retained == fileNameCandidate
-                ? ImageDateSource.FileName
-                : retained == fileSystemCandidate
-                    ? ImageDateSource.FileSystem
-                    : ImageDateSource.None;
+        var retained = native ?? fromName ?? fromFileSystem;
+        var source = native is not null ? ImageDateSource.NativeMetadata
+            : fromName is not null ? ImageDateSource.FileName
+            : fromFileSystem is not null ? ImageDateSource.FileSystem
+            : ImageDateSource.None;
 
-        var normalizedFileNamePreview = retained is null
+        var preview = retained is null
             ? null
-            : NormalizedFileNameBuilder.Build(retained.Date, retained.HasTime, Path.GetExtension(filePath), filePath);
+            : NormalizedFileNameBuilder.Build(retained, Path.GetExtension(filePath), filePath);
 
-        return new ImageDateMetadata(
-            nativeMetadataCandidate?.Date,
-            fileNameCandidate?.Date,
-            fileSystemCandidate?.Date,
-            retained?.Date,
-            retainedSource,
-            retained?.HasTime ?? false,
-            normalizedFileNamePreview);
+        return new ImageDateMetadata(native, fromName, fromFileSystem, retained, source, preview);
     }
 }

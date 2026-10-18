@@ -31,7 +31,7 @@ public sealed class FileNameDateParserTests
 
         Assert.NotNull(result);
         Assert.Equal(hasTime, result.HasTime);
-        Assert.Equal(new DateTime(year, month, day, hour, minute, second, DateTimeKind.Utc), result.Date.UtcDateTime);
+        Assert.Equal(new DateTime(year, month, day, hour, minute, second), result.WallClock);
     }
 
     [Fact]

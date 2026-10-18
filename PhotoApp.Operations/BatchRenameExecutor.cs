@@ -74,7 +74,7 @@ public sealed class BatchRenameExecutor
             File.Delete(tempPath);
 
             // 3. Apply timestamps
-            _timestampApplier.ApplyTimestamps(jpegPath, plan.RetainedDate);
+            _timestampApplier.ApplyTimestamps(jpegPath, plan.Date.ToInstant(TimeZoneInfo.Local));
 
             // 4. Rename to final target
             File.Move(jpegPath, targetPath, overwrite: false);

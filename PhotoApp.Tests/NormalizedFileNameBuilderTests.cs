@@ -1,4 +1,5 @@
 using System.IO;
+using PhotoApp.Core.Models;
 using PhotoApp.Core.Services;
 
 namespace PhotoApp.Tests;
@@ -27,9 +28,9 @@ public sealed class NormalizedFileNameBuilderTests
         bool hasTime,
         string expected)
     {
-        var date = new DateTimeOffset(year, month, day, hour, minute, second, TimeSpan.Zero);
+        var date = new ImageDateCandidate(new DateTime(year, month, day, hour, minute, second), hasTime);
 
-        var result = NormalizedFileNameBuilder.Build(date, hasTime, Path.GetExtension(filename), filename);
+        var result = NormalizedFileNameBuilder.Build(date, Path.GetExtension(filename), filename);
 
         Assert.Equal(expected, result);
     }

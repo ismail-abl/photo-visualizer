@@ -14,7 +14,8 @@ public class FileSystemDateReader
         try
         {
             var fileInfo = new FileInfo(filePath);
-            return new ImageDateCandidate(new DateTimeOffset(DateTime.SpecifyKind(fileInfo.LastWriteTime, DateTimeKind.Utc)), true);
+            var wallClock = fileInfo.LastWriteTime;
+            return new ImageDateCandidate(wallClock, true, TimeZoneInfo.Local.GetUtcOffset(wallClock));
         }
         catch (UnauthorizedAccessException)
         {

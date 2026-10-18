@@ -6,14 +6,14 @@ namespace PhotoApp.Core.Services;
 
 public static class NormalizedFileNameBuilder
 {
-    public static string Build(DateTimeOffset date, bool hasTime, string extension, string sourceIdentifier, string? collisionToken = null)
+    public static string Build(ImageDateCandidate date, string extension, string sourceIdentifier, string? collisionToken = null)
     {
         var extensionValue = NormalizeExtension(extension);
-        var baseName = hasTime
-            ? $"IMG-{date.DateTime:yyyyMMdd-HHmmss}"
-            : $"IMG-{date.DateTime:yyyyMMdd}";
+        var baseName = date.HasTime
+            ? $"IMG-{date.WallClock:yyyyMMdd-HHmmss}"
+            : $"IMG-{date.WallClock:yyyyMMdd}";
 
-        if (!hasTime || !string.IsNullOrWhiteSpace(collisionToken))
+        if (!date.HasTime || !string.IsNullOrWhiteSpace(collisionToken))
         {
             var token = collisionToken ?? GenerateShortHash(sourceIdentifier);
             baseName += $"-{token}";
@@ -24,12 +24,9 @@ public static class NormalizedFileNameBuilder
 
     public static string? Build(ImageDateMetadata metadata, string extension, string sourceIdentifier, string? collisionToken = null)
     {
-        if (metadata.RetainedDate is null)
-        {
-            return null;
-        }
-
-        return Build(metadata.RetainedDate.Value, metadata.RetainedDateHasTime, extension, sourceIdentifier, collisionToken);
+        return metadata.RetainedCandidate is null
+            ? null
+            : Build(metadata.RetainedCandidate, extension, sourceIdentifier, collisionToken);
     }
 
     private static string NormalizeExtension(string extension)

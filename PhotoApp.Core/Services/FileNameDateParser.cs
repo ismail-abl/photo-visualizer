@@ -46,7 +46,7 @@ public class FileNameDateParser
             return null;
         }
 
-        return new ImageDateCandidate(new DateTimeOffset(DateTime.SpecifyKind(dateOnly, DateTimeKind.Utc)), false);
+        return new ImageDateCandidate(DateTime.SpecifyKind(dateOnly, DateTimeKind.Unspecified), false);
     }
 
     private static ImageDateCandidate? TryParseTimePatterns(string fileName)
@@ -59,16 +59,16 @@ public class FileNameDateParser
                 continue;
             }
 
-            if (TryBuildDate(match, out var dateTimeOffset))
+            if (TryBuildDate(match, out var wallClock))
             {
-                return new ImageDateCandidate(dateTimeOffset, true);
+                return new ImageDateCandidate(wallClock, true);
             }
         }
 
         return null;
     }
 
-    private static bool TryBuildDate(Match match, out DateTimeOffset dateTimeOffset)
+    private static bool TryBuildDate(Match match, out DateTime wallClock)
     {
         var yearText = match.Groups["year"].Value;
         var monthText = match.Groups["month"].Value;
@@ -84,19 +84,18 @@ public class FileNameDateParser
             !int.TryParse(minuteText, NumberStyles.None, CultureInfo.InvariantCulture, out var minute) ||
             !int.TryParse(secondText, NumberStyles.None, CultureInfo.InvariantCulture, out var second))
         {
-            dateTimeOffset = default;
+            wallClock = default;
             return false;
         }
 
         try
         {
-            var dateTime = new DateTime(year, month, day, hour, minute, second, DateTimeKind.Utc);
-            dateTimeOffset = new DateTimeOffset(dateTime);
+            wallClock = new DateTime(year, month, day, hour, minute, second, DateTimeKind.Unspecified);
             return true;
         }
         catch (ArgumentOutOfRangeException)
         {
-            dateTimeOffset = default;
+            wallClock = default;
             return false;
         }
     }

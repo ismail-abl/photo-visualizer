@@ -131,17 +131,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
-            var imageData = new System.Collections.Generic.List<(string sourcePath, System.DateTimeOffset retainedDate, bool hasTime, string extension)>();
+            var imageData = new List<(string sourcePath, ImageDateCandidate date, string extension)>();
             foreach (var img in Images)
             {
-                if (img.DateMetadata?.RetainedDate != null)
+                if (img.DateMetadata?.RetainedCandidate is { } date)
                 {
-                    imageData.Add((
-                        img.FullPath,
-                        img.DateMetadata.RetainedDate.Value,
-                        img.DateMetadata.RetainedDateHasTime,
-                        img.Extension
-                    ));
+                    imageData.Add((img.FullPath, date, img.Extension));
                 }
             }
 

@@ -6,13 +6,15 @@ namespace PhotoApp.Tests;
 
 public sealed class BatchRenameExecutorTests
 {
+    private static readonly ImageDateCandidate Noon = new(new DateTime(2023, 1, 1, 12, 0, 0), true, TimeSpan.Zero);
+
     [Fact]
     public void DryRun_ReturnsResultsWithoutExecuting()
     {
         var plans = new List<RenamePlan>
         {
-            new("source1.jpg", "target1.jpg", DateTimeOffset.Now, true),
-            new("source2.jpg", "target2.jpg", DateTimeOffset.Now, true)
+            new("source1.jpg", "target1.jpg", Noon),
+            new("source2.jpg", "target2.jpg", Noon)
         };
         var outputFolder = "output";
         var executor = new BatchRenameExecutor(Mock.Of<IImageConverter>(), Mock.Of<IFileTimestampApplier>());
@@ -33,7 +35,7 @@ public sealed class BatchRenameExecutorTests
         {
             var sourcePath = Path.Combine(tempDir, "source.jpg");
             File.WriteAllText(sourcePath, "fake jpeg");
-            var plan = new RenamePlan(sourcePath, "target.jpg", new DateTimeOffset(2023, 1, 1, 12, 0, 0, TimeSpan.Zero), true);
+            var plan = new RenamePlan(sourcePath, "target.jpg", Noon);
             var outputFolder = Path.Combine(tempDir, "output");
             var mockConverter = new Mock<IImageConverter>();
             mockConverter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>())).Callback<string, string, int>((input, output, q) => File.Copy(input, output));
@@ -45,7 +47,7 @@ public sealed class BatchRenameExecutorTests
             Assert.Single(results);
             Assert.True(results[0].Success);
             mockConverter.Verify(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), 80), Times.Once);
-            mockApplier.Verify(a => a.ApplyTimestamps(It.IsAny<string>(), plan.RetainedDate), Times.Once);
+            mockApplier.Verify(a => a.ApplyTimestamps(It.IsAny<string>(), new DateTimeOffset(2023, 1, 1, 12, 0, 0, TimeSpan.Zero)), Times.Once);
         }
         finally
         {
@@ -62,7 +64,7 @@ public sealed class BatchRenameExecutorTests
         {
             var sourcePath = Path.Combine(tempDir, "source.png");
             File.WriteAllText(sourcePath, "fake png");
-            var plan = new RenamePlan(sourcePath, "target.jpg", new DateTimeOffset(2023, 1, 1, 12, 0, 0, TimeSpan.Zero), true);
+            var plan = new RenamePlan(sourcePath, "target.jpg", Noon);
             var outputFolder = Path.Combine(tempDir, "output");
             var mockConverter = new Mock<IImageConverter>();
             mockConverter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>())).Callback<string, string, int>((input, output, q) =>
@@ -94,7 +96,7 @@ public sealed class BatchRenameExecutorTests
         {
             var sourcePath = Path.Combine(tempDir, "source.jpg");
             File.WriteAllText(sourcePath, "fake jpeg");
-            var plan = new RenamePlan(sourcePath, "target.jpg", new DateTimeOffset(2023, 1, 1, 12, 0, 0, TimeSpan.Zero), true);
+            var plan = new RenamePlan(sourcePath, "target.jpg", Noon);
             var outputFolder = Path.Combine(tempDir, "output");
             var mockConverter = new Mock<IImageConverter>();
             mockConverter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>())).Callback<string, string, int>((input, output, q) => File.Copy(input, output));
@@ -122,7 +124,7 @@ public sealed class BatchRenameExecutorTests
         {
             var sourcePath = Path.Combine(tempDir, "source.jpg");
             File.WriteAllText(sourcePath, "fake jpeg");
-            var plan = new RenamePlan(sourcePath, "target.jpg", new DateTimeOffset(2023, 1, 1, 12, 0, 0, TimeSpan.Zero), true);
+            var plan = new RenamePlan(sourcePath, "target.jpg", Noon);
             var outputFolder = Path.Combine(tempDir, "output");
             var mockConverter = new Mock<IImageConverter>();
             mockConverter.Setup(c => c.ConvertToJpeg(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>())).Throws(new Exception("Conversion failed"));

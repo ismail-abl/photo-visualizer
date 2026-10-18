@@ -1,13 +1,20 @@
-using System.Globalization;
 using MetadataExtractor;
 using MetadataExtractor.Formats.Exif;
 using MetadataExtractor.Formats.Xmp;
 using PhotoApp.Core.Models;
+using PhotoApp.Core.Services;
 
 namespace PhotoApp.Metadata;
 
 public class NativeImageMetadataReader
 {
+    // OffsetTimeOriginal / OffsetTimeDigitized (EXIF 2.31), lus en texte : "+09:00".
+    private const int TagOffsetTimeOriginal = 0x9011;
+    private const int TagOffsetTimeDigitized = 0x9012;
+
+    // Dates de prise de vue uniquement : xmp:ModifyDate et xmp:MetadataDate sont des dates d'édition.
+    private static readonly string[] XmpDateKeys = ["exif:DateTimeOriginal", "photoshop:DateCreated", "xmp:CreateDate"];
+
     public virtual ImageDateCandidate? Read(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath))
@@ -25,80 +32,44 @@ public class NativeImageMetadataReader
             return null;
         }
 
-        var exifDate = ReadExifDate(directories);
-        if (exifDate is not null)
-        {
-            return exifDate;
-        }
-
-        var xmpDate = ReadXmpDate(directories);
-        if (xmpDate is not null)
-        {
-            return xmpDate;
-        }
-
-        return null;
+        return ReadExifDate(directories) ?? ReadXmpDate(directories);
     }
 
     private static ImageDateCandidate? ReadExifDate(IEnumerable<MetadataExtractor.Directory> directories)
     {
-        foreach (var directory in directories)
+        foreach (var exifDirectory in directories.OfType<ExifSubIfdDirectory>())
         {
-            if (directory is not ExifSubIfdDirectory exifDirectory)
+            if (exifDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out var original))
             {
-                continue;
+                return new ImageDateCandidate(original, true, ReadOffset(exifDirectory, TagOffsetTimeOriginal));
             }
 
-            if (exifDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out var originalDateTime))
+            if (exifDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeDigitized, out var digitized))
             {
-                return new ImageDateCandidate(ToUtcOffset(originalDateTime), true);
-            }
-
-            if (exifDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeDigitized, out var digitizedDateTime))
-            {
-                return new ImageDateCandidate(ToUtcOffset(digitizedDateTime), true);
+                return new ImageDateCandidate(digitized, true, ReadOffset(exifDirectory, TagOffsetTimeDigitized));
             }
         }
 
         return null;
     }
+
+    private static TimeSpan? ReadOffset(ExifSubIfdDirectory directory, int tag) =>
+        UtcOffsetParser.TryParse(directory.GetString(tag), out var offset) ? offset : null;
 
     private static ImageDateCandidate? ReadXmpDate(IEnumerable<MetadataExtractor.Directory> directories)
     {
-        foreach (var directory in directories)
+        foreach (var xmpDirectory in directories.OfType<XmpDirectory>())
         {
-            if (directory is not XmpDirectory xmpDirectory)
-            {
-                continue;
-            }
-
             var properties = xmpDirectory.GetXmpProperties();
-            if (TryReadXmpProperty(properties, "xmp:CreateDate", out var xmpDate) ||
-                TryReadXmpProperty(properties, "xmp:ModifyDate", out xmpDate) ||
-                TryReadXmpProperty(properties, "xmp:MetadataDate", out xmpDate) ||
-                TryReadXmpProperty(properties, "photoshop:DateCreated", out xmpDate))
+            foreach (var key in XmpDateKeys)
             {
-                return new ImageDateCandidate(xmpDate, true);
+                if (properties.TryGetValue(key, out var value) && XmpDateParser.Parse(value) is { } candidate)
+                {
+                    return candidate;
+                }
             }
         }
 
         return null;
-    }
-
-    private static bool TryReadXmpProperty(IDictionary<string, string> properties, string key, out DateTimeOffset dateTime)
-    {
-        if (properties.TryGetValue(key, out var value) &&
-            DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dateTime))
-        {
-            return true;
-        }
-
-        dateTime = default;
-        return false;
-    }
-
-    private static DateTimeOffset ToUtcOffset(DateTime dateTime)
-    {
-        return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Utc));
     }
 }
