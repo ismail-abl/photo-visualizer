@@ -1,7 +1,7 @@
 using System.IO;
 using ImageMagick;
 
-namespace PhotoApp.Core.Services;
+namespace PhotoApp.Operations;
 
 public sealed class ImageConverter : IImageConverter
 {

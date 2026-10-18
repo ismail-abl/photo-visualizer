@@ -4,7 +4,7 @@ using MetadataExtractor.Formats.Exif;
 using MetadataExtractor.Formats.Xmp;
 using PhotoApp.Core.Models;
 
-namespace PhotoApp.Core.Services;
+namespace PhotoApp.Metadata;
 
 public class NativeImageMetadataReader
 {

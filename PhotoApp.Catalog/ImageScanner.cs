@@ -1,6 +1,7 @@
 using PhotoApp.Core.Models;
+using PhotoApp.Core.Services;
 
-namespace PhotoApp.Core.Services;
+namespace PhotoApp.Catalog;
 
 public sealed class ImageScanner
 {

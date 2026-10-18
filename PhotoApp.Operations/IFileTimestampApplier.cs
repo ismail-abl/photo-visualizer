@@ -1,4 +1,4 @@
-namespace PhotoApp.Core.Services;
+namespace PhotoApp.Operations;
 
 public interface IFileTimestampApplier
 {

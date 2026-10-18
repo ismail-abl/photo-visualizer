@@ -1,6 +1,6 @@
 using PhotoApp.Core.Models;
 
-namespace PhotoApp.Core.Services;
+namespace PhotoApp.Metadata;
 
 public class FileSystemDateReader
 {

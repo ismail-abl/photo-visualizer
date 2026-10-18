@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace PhotoApp.Core.Services;
+namespace PhotoApp.Operations;
 
 public sealed class FileTimestampApplier : IFileTimestampApplier
 {

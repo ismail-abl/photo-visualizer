@@ -27,5 +27,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PhotoApp.Core\PhotoApp.Core.csproj" />
+    <ProjectReference Include="..\PhotoApp.Metadata\PhotoApp.Metadata.csproj" />
+    <ProjectReference Include="..\PhotoApp.Catalog\PhotoApp.Catalog.csproj" />
+    <ProjectReference Include="..\PhotoApp.Operations\PhotoApp.Operations.csproj" />
   </ItemGroup>
 </Project>

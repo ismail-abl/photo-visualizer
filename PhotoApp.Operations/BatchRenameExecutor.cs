@@ -1,7 +1,7 @@
 using System.IO;
 using PhotoApp.Core.Models;
 
-namespace PhotoApp.Core.Services;
+namespace PhotoApp.Operations;
 
 public sealed class BatchRenameExecutor
 {

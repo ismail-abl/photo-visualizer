@@ -3,8 +3,11 @@ using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PhotoApp.Catalog;
 using PhotoApp.Core.Models;
 using PhotoApp.Core.Services;
+using PhotoApp.Metadata;
+using PhotoApp.Operations;
 
 namespace PhotoApp.ViewModels;
 
@@ -153,7 +156,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var planner = new PhotoApp.Core.Services.RenamePlanner();
             var plans = planner.PlanRenames(imageData, outputFolder);
 
-            var executor = new PhotoApp.Core.Services.BatchRenameExecutor();
+            var executor = new BatchRenameExecutor();
             
             // Execute in background
             var results = await System.Threading.Tasks.Task.Run(() => 
