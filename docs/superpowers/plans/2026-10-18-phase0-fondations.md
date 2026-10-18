@@ -2,11 +2,13 @@
 
 > **Pour les agents d'exécution :** SOUS-COMPÉTENCE REQUISE : utiliser superpowers:subagent-driven-development (recommandé) ou superpowers:executing-plans pour exécuter ce plan tâche par tâche. Les étapes utilisent des cases à cocher (`- [ ]`).
 
-**Objectif :** rendre le flux actuel (scan → date → renommage/conversion JPEG) fiable sur JPEG et PNG : corriger les 9 défauts du §3.1 de la spec, remplacer ImageSharp vulnérable, découper en projets, centraliser les données de l'application, et mettre en place les tests et l'intégration continue sur 3 OS.
+**Objectif :** rendre le flux actuel (scan → date → renommage/conversion JPEG) fiable sur JPEG et PNG : corriger les 9 défauts du §3.1 de la spec, remplacer ImageSharp vulnérable par Magick.NET, découper en projets, centraliser les données de l'application, et mettre en place les tests et l'intégration continue sur 3 OS.
+
+> **Révision du 2026-10-18 (décision utilisateur) :** ImageSharp est **remplacé par Magick.NET** au lieu d'être mis à jour. Raisons : ImageSharp 4.x exige une clé de licence pour tout build Release ; la 3.1.12 garde un avis modéré (GHSA-gwg2-r3hj-4w44) ; Magick.NET était déjà retenu par la spec (§2) pour HEIC/AVIF/RAW. Conséquence : HEIC, HEIF et AVIF deviennent convertibles dès la phase 0 (défaut 2 réellement corrigé).
 
 **Architecture :** la solution passe de 3 à 6 projets : `PhotoApp.Core` (pur, sans E/S : modèles, parseur de noms, nommage, planification), `PhotoApp.Metadata` (lecture MetadataExtractor), `PhotoApp.Catalog` (scanner), `PhotoApp.Operations` (conversion, exécution, manifeste), `PhotoApp` (Avalonia), `PhotoApp.Tests`. La date devient une **heure murale** (`DateTime` sans fuseau + décalage optionnel), jamais un faux UTC. Un **manifeste** par dossier de sortie, stocké dans les données de l'application, rend le flux idempotent.
 
-**Tech Stack :** .NET 10, Avalonia 12.0.2, CommunityToolkit.Mvvm, MetadataExtractor 2.9.3, SixLabors.ImageSharp (dernière version corrigée), xUnit + Moq, GitHub Actions.
+**Tech Stack :** .NET 10, Avalonia 12.0.2, CommunityToolkit.Mvvm, MetadataExtractor 2.9.3, Magick.NET-Q8-AnyCPU 14.17.2 (Apache-2.0, binaires natifs Windows/Linux/macOS inclus), xUnit + Moq, GitHub Actions.
 
 **Spec :** `docs/superpowers/specs/2026-10-14-vision-feuille-de-route-design.md` (§3.1 défauts, §4 architecture, §5.5 nommage, §9 données, §10 phase 0, §11 tests)
 
@@ -23,11 +25,11 @@
 
 ## Hors phase 0 (explicite)
 
-Projet `PhotoApp.Cli` (phase 1), profils de sources et confrontation de candidats (phase 1), écriture ExifTool (phase 3), HEIC/AVIF via Magick.NET (phase 5), journal/annulation/quarantaine (phase 2). La suppression de l'original (`DeleteOriginalAfterSuccess`) reste telle quelle jusqu'à la phase 2.
+Projet `PhotoApp.Cli` (phase 1), profils de sources et confrontation de candidats (phase 1), écriture ExifTool (phase 3), règles fines de conversion — qualité réglable, « ignorer si plus lourd », profil ICC Display P3 vérifié (phase 5), journal/annulation/quarantaine (phase 2). La suppression de l'original (`DeleteOriginalAfterSuccess`) reste telle quelle jusqu'à la phase 2.
 
 ## Écarts assumés par rapport à la spec
 
-- **Corpus de test** : les fichiers d'exemple sont **générés à l'exécution** (ImageSharp, quelques centaines d'octets) plutôt que versionnés : aucune donnée privée possible, et le corpus s'enrichit par ajout de cas de test.
+- **Corpus de test** : les fichiers d'exemple sont **générés à l'exécution** (Magick.NET, quelques centaines d'octets) plutôt que versionnés : aucune donnée privée possible, et le corpus s'enrichit par ajout de cas de test.
 - **Heure sans décalage** : une heure EXIF sans `OffsetTime` est interprétée dans le fuseau du PC au moment d'écrire les dates du fichier. Le décalage horaire par lot (photos du Japon) arrive en phase 3.
 - **Empreinte d'idempotence** : taille + date de modification de la source (le SHA-256 arrive avec les doublons, phase 5).
 
@@ -56,7 +58,7 @@ PhotoApp.Metadata/                    MetadataExtractor
   NativeImageMetadataReader.cs, FileSystemDateReader.cs, ImageDateResolver.cs
 PhotoApp.Catalog/
   ImageScanner.cs, ScanOptions.cs
-PhotoApp.Operations/                  ImageSharp
+PhotoApp.Operations/                  Magick.NET
   IImageConverter.cs, ImageConverter.cs, IFileTimestampApplier.cs, FileTimestampApplier.cs
   BatchRenameExecutor.cs, ProcessedManifest.cs, ConversionService.cs, ConversionSummary.cs
 PhotoApp/                             Avalonia (MainWindowViewModel asynchrone)
@@ -66,13 +68,13 @@ PhotoApp.Tests/                       + TestImages.cs, TempDirectory.cs
 
 ---
 
-### Tâche 1 : Branche de travail, base de référence, mise à jour d'ImageSharp (défaut 8)
+### Tâche 1 : Branche de travail, base de référence, remplacement d'ImageSharp par Magick.NET (défaut 8)
 
 **Fichiers :**
-- Modifier : `PhotoApp.Core/PhotoApp.Core.csproj` (version d'ImageSharp)
+- Modifier : `PhotoApp.Core/PhotoApp.Core.csproj` (ImageSharp retiré, Magick.NET ajouté), `PhotoApp.Core/Services/ImageConverter.cs` (même comportement, moteur Magick.NET)
 
 **Interfaces :**
-- Produit : une version d'ImageSharp sans vulnérabilité connue, utilisée par toutes les tâches suivantes.
+- Produit : `Magick.NET-Q8-AnyCPU 14.17.2`, sans vulnérabilité connue, utilisé par toutes les tâches suivantes (espace de noms `ImageMagick`).
 
 - [ ] **Étape 1 : Créer la branche d'implémentation à partir de la branche docs**
 
@@ -94,13 +96,23 @@ Attendu : `Réussi!  - Échec : 0, Réussite : 32`
 Run : `dotnet list PhotoVisualizer.slnx package --vulnerable --include-transitive`
 Attendu : une section listant `SixLabors.ImageSharp 3.1.11` avec des avis de gravité élevée.
 
-- [ ] **Étape 4 : Mettre à jour vers la dernière version stable**
+- [ ] **Étape 4 : Remplacer ImageSharp par Magick.NET**
 
-Run : `dotnet add PhotoApp.Core package SixLabors.ImageSharp`
+```bash
+dotnet remove PhotoApp.Core package SixLabors.ImageSharp
+dotnet add PhotoApp.Core package Magick.NET-Q8-AnyCPU --version 14.17.2
+```
+
+Dans `ImageConverter.cs`, remplacer les `using SixLabors…` par `using ImageMagick;` et la branche de conversion par :
+
+```csharp
+            using var image = new MagickImage(inputPath);
+            image.Quality = (uint)quality;
+            image.Write(outputPath, MagickFormat.Jpeg);
+```
+
 Puis : `dotnet list PhotoVisualizer.slnx package --vulnerable --include-transitive`
-Attendu : `Le projet donné n'a aucun package vulnérable` pour chaque projet. Noter la version installée (`grep ImageSharp PhotoApp.Core/PhotoApp.Core.csproj`).
-
-Si la montée de version casse la compilation (changement d'API), corriger uniquement `ImageConverter.cs` (`Image.Load`, `JpegEncoder { Quality }`, `image.Save`).
+Attendu : aucun package vulnérable pour chaque projet ; `grep -rn ImageSharp --include=*.cs --include=*.csproj .` ne renvoie rien (hors `bin/` et `obj/`).
 
 - [ ] **Étape 5 : Vérifier que tout passe**
 
@@ -110,8 +122,8 @@ Attendu : 32 réussis.
 - [ ] **Étape 6 : Commit**
 
 ```bash
-git add PhotoApp.Core/PhotoApp.Core.csproj
-git commit -m "fix: mise à jour d'ImageSharp (vulnérabilités connues)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add PhotoApp.Core docs/superpowers/plans
+git commit -m "fix: remplacement d'ImageSharp vulnérable par Magick.NET" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -140,9 +152,9 @@ dotnet add PhotoApp.Catalog reference PhotoApp.Core/PhotoApp.Core.csproj
 dotnet add PhotoApp.Operations reference PhotoApp.Core/PhotoApp.Core.csproj
 
 dotnet add PhotoApp.Metadata package MetadataExtractor --version 2.9.3
-dotnet add PhotoApp.Operations package SixLabors.ImageSharp
+dotnet add PhotoApp.Operations package Magick.NET-Q8-AnyCPU --version 14.17.2
 dotnet remove PhotoApp.Core package MetadataExtractor
-dotnet remove PhotoApp.Core package SixLabors.ImageSharp
+dotnet remove PhotoApp.Core package Magick.NET-Q8-AnyCPU
 
 dotnet sln PhotoVisualizer.slnx add PhotoApp.Metadata PhotoApp.Catalog PhotoApp.Operations
 
@@ -150,7 +162,7 @@ dotnet add PhotoApp reference PhotoApp.Metadata PhotoApp.Catalog PhotoApp.Operat
 dotnet add PhotoApp.Tests reference PhotoApp.Metadata PhotoApp.Catalog PhotoApp.Operations
 ```
 
-Vérifier que `PhotoApp.Operations` a bien la même version d'ImageSharp qu'à la tâche 1 (`grep ImageSharp PhotoApp.Operations/*.csproj`).
+Vérifier que `PhotoApp.Operations` référence bien `Magick.NET-Q8-AnyCPU 14.17.2` (`grep Magick PhotoApp.Operations/*.csproj`).
 
 - [ ] **Étape 2 : Déplacer les fichiers et changer les espaces de noms**
 
@@ -564,24 +576,24 @@ public sealed class XmpDateParserTests
 `PhotoApp.Tests/TestImages.cs` :
 
 ```csharp
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Metadata.Profiles.Exif;
-using SixLabors.ImageSharp.PixelFormats;
+using ImageMagick;
 
 namespace PhotoApp.Tests;
 
 /// <summary>Génère de petites images d'exemple : le corpus de test ne contient aucune donnée privée.</summary>
 public static class TestImages
 {
-    public static void WritePng(string path)
+    public static void Write(string path, MagickFormat format)
     {
-        using var image = new Image<Rgb24>(8, 8);
-        image.SaveAsPng(path);
+        using var image = new MagickImage(MagickColors.Gray, 8, 8);
+        image.Write(path, format);
     }
+
+    public static void WritePng(string path) => Write(path, MagickFormat.Png);
 
     public static void WriteJpeg(string path, string? exifDateTimeOriginal = null, string? exifOffsetTimeOriginal = null)
     {
-        using var image = new Image<Rgb24>(8, 8);
+        using var image = new MagickImage(MagickColors.Gray, 8, 8);
         if (exifDateTimeOriginal is not null || exifOffsetTimeOriginal is not null)
         {
             var exif = new ExifProfile();
@@ -595,10 +607,10 @@ public static class TestImages
                 exif.SetValue(ExifTag.OffsetTimeOriginal, exifOffsetTimeOriginal);
             }
 
-            image.Metadata.ExifProfile = exif;
+            image.SetProfile(exif);
         }
 
-        image.SaveAsJpeg(path);
+        image.Write(path, MagickFormat.Jpeg);
     }
 }
 ```
@@ -1010,7 +1022,7 @@ remplacer chaque `new RenamePlan(src, tgt, <date>, true)` par `new RenamePlan(sr
 - [ ] **Étape 6 : Tout vérifier**
 
 Run : `dotnet test PhotoVisualizer.slnx`
-Attendu : tous les tests passent (32 adaptés + nouveaux). Si `NativeImageMetadataReaderTests.Read_ExifOffsetTime_IsReturned` échoue parce que `ExifTag.OffsetTimeOriginal` n'existe pas dans la version d'ImageSharp installée, écrire la valeur avec `new ExifTag<string>((ExifTagValue)0x9011)` à la place et noter l'écart.
+Attendu : tous les tests passent (32 adaptés + nouveaux). Si `ExifTag.OffsetTimeOriginal` n'existe pas dans Magick.NET, chercher le nom exact dans `ImageMagick.ExifTag` (balise 0x9011) et noter l'écart.
 
 - [ ] **Étape 7 : Commit**
 

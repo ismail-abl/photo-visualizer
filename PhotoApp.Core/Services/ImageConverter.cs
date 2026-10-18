@@ -1,6 +1,5 @@
 using System.IO;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
+using ImageMagick;
 
 namespace PhotoApp.Core.Services;
 
@@ -16,10 +15,10 @@ public sealed class ImageConverter : IImageConverter
         }
         else if (extension == ".png" || extension == ".bmp" || extension == ".gif" || extension == ".tiff" || extension == ".tif")
         {
-            // Convert using ImageSharp
-            using var image = Image.Load(inputPath);
-            var encoder = new JpegEncoder { Quality = quality };
-            image.Save(outputPath, encoder);
+            // Convert using Magick.NET
+            using var image = new MagickImage(inputPath);
+            image.Quality = (uint)quality;
+            image.Write(outputPath, MagickFormat.Jpeg);
         }
         else
         {
