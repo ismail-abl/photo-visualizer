@@ -42,6 +42,12 @@ public sealed class SourceProfilesTests
     [InlineData("20260917_222944.heic", "samsung", "samsung", 2026, 9, 17, 22, 29, 44, DatePrecision.Second)]
     [InlineData("20260411_001511.jpg", null, "samsung", 2026, 4, 11, 0, 15, 11, DatePrecision.Second)]
     [InlineData("24-07-11 17-07-10 0477.mov", null, "nextcloud-ios", 2024, 7, 11, 17, 7, 10, DatePrecision.Second)]
+    [InlineData("24-03-02 04-33-29 4f99.jpg", null, "nextcloud-ios", 2024, 3, 2, 4, 33, 29, DatePrecision.Second)]
+    [InlineData("Wow_2024_05_06_21_10_33_123.png", null, "capture-jeu", 2024, 5, 6, 21, 10, 33, DatePrecision.SubSecond)]
+    [InlineData("League of Legends_2023_12_26_20_04_56_789.jpg", null, "capture-jeu", 2023, 12, 26, 20, 4, 56, DatePrecision.SubSecond)]
+    [InlineData("Persona 5 Royal 15.01.2025 00_54_14.jpg", null, "capture-jeu", 2025, 1, 15, 0, 54, 14, DatePrecision.Second)]
+    [InlineData("Steam 03_04_2024 10_00_00.jpg", null, "capture-jeu", 2024, 4, 3, 10, 0, 0, DatePrecision.Second)]
+    [InlineData("Pasted image 20231025140352.jpg", null, "obsidian-colle", 2023, 10, 25, 14, 3, 52, DatePrecision.Second)]
     [InlineData("PXL_20230304_122015123.jpg", null, "pixel", 2023, 3, 4, 12, 20, 15, DatePrecision.SubSecond)]
     [InlineData("PXL_20230304_122015123.MP.jpg", null, "pixel", 2023, 3, 4, 12, 20, 15, DatePrecision.SubSecond)]
     public void Read_RecognizesTheProfileAndTheDate(

@@ -58,6 +58,12 @@ public static class SourceProfiles
               + @" (?:at|à|um|a las) (?<hour>\d{1,2})[.:](?<minute>\d{2})[.:](?<second>\d{2})(?:\s?(?<ampm>[AP]M))?(?: \((?<counter>\d+)\))?$")
         ]),
 
+        new("capture-jeu", "Capture de jeu (AMD, Steam…)", ProfileFamily.Screenshot,
+        [
+            P(@"^.+?_(?<year>\d{4})_(?<month>\d{2})_(?<day>\d{2})_(?<hour>\d{2})_(?<minute>\d{2})_(?<second>\d{2})_(?<fraction>\d{3})$"),
+            P(@"^.+ (?<d1>\d{2})[._](?<d2>\d{2})[._](?<year>\d{4}) (?<hour>\d{2})_(?<minute>\d{2})_(?<second>\d{2})$")
+        ], DayMonthOrder: DayMonthOrder.DayFirst),
+
         // Appareils.
         new("pixel", "Google Pixel", ProfileFamily.Camera,
         [
@@ -73,7 +79,7 @@ public static class SourceProfiles
         ], MakePattern: P("^samsung$")),
         new("nextcloud-ios", "iPhone (Nextcloud iOS)", ProfileFamily.Camera,
         [
-            P(@"^(?<year>\d{2})-(?<month>\d{2})-(?<day>\d{2}) (?<hour>\d{2})-(?<minute>\d{2})-(?<second>\d{2}) (?<counter>\d{4})$")
+            P(@"^(?<year>\d{2})-(?<month>\d{2})-(?<day>\d{2}) (?<hour>\d{2})-(?<minute>\d{2})-(?<second>\d{2}) (?:(?<counter>\d{4})|[0-9a-f]{4})$")
         ]),
         new("iphone", "iPhone", ProfileFamily.Camera,
         [
@@ -83,6 +89,10 @@ public static class SourceProfiles
         // Exports et téléchargements.
         new("wechat", "WeChat", ProfileFamily.Export, [P(@"^mmexport(?<epoch>\d{13}|\d{10})(?!\d)")], TimeSemantics: NameTimeSemantics.Utc),
         new("facebook", "Facebook", ProfileFamily.Export, [P(@"^FB_IMG_(?<epoch>\d{13}|\d{10})(?!\d)")], TimeSemantics: NameTimeSemantics.Utc),
+        new("obsidian-colle", "Image collée (Obsidian)", ProfileFamily.Export,
+        [
+            P(@"^Pasted image (?<year>\d{4})(?<month>\d{2})(?<day>\d{2})(?<hour>\d{2})(?<minute>\d{2})(?<second>\d{2})$")
+        ]),
         new("snapchat", "Snapchat", ProfileFamily.Export, [P(@"^Snapchat-\d+$")], FolderPattern: P("^Snapchat$")),
         new("miniature-video", "Miniature téléchargée", ProfileFamily.Export, [P(@"^(?:hq|mq|sd|maxres)?default(?:-\w+)?$")]),
         new("epoch", "Horodatage epoch", ProfileFamily.Export, [P(@"^(?<epoch>\d{13}|\d{10})$")], TimeSemantics: NameTimeSemantics.Utc)

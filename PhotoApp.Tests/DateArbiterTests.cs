@@ -246,4 +246,13 @@ public sealed class DateArbiterTests
 
         Assert.True(decision.Flags.HasFlag(DecisionFlags.Derivative));
     }
+
+    [Fact]
+    public void GameCapture_IsAScreenshot()
+    {
+        var decision = Decide("Wow_2024_05_06_21_10_33_123.png");
+
+        Assert.Equal(Reasons.ScreenshotName, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+    }
 }

@@ -92,4 +92,50 @@ public sealed class DateComparisonTests
         Assert.True(DateComparison.CompareAt(morning, evening, DatePrecision.Second) < 0);
         Assert.True(DateComparison.CompareAt(Local(8, 0, 0, day: 6), evening, DatePrecision.Day) > 0);
     }
+
+    [Theory]
+    [InlineData(4, true)]
+    [InlineData(10, true)]
+    [InlineData(11, false)]
+    [InlineData(-2, true)]
+    [InlineData(-3, false)]
+    public void ExifMatchesName_AllowsTheWriteLatency(int exifMinusNameSeconds, bool expected)
+    {
+        var name = new DateCandidate(new DateTime(2026, 10, 12, 1, 49, 32), DatePrecision.Second, CandidateOrigin.FileName);
+        var exif = new DateCandidate(new DateTime(2026, 10, 12, 1, 49, 32).AddSeconds(exifMinusNameSeconds), DatePrecision.Second, CandidateOrigin.ExifOriginal);
+
+        Assert.Equal(expected, DateComparison.ExifMatchesName(exif, name));
+    }
+
+    [Fact]
+    public void ZoneGap_MovieHeaderMayBeWrittenAtTheEndOfTheRecording()
+    {
+        var start = new DateCandidate(new DateTime(2023, 10, 27, 19, 52, 14), DatePrecision.Second, CandidateOrigin.FileName);
+        DateCandidate Header(int h, int m, int s) => new(new DateTime(2023, 10, 27, h, m, s), DatePrecision.Second, CandidateOrigin.QuickTimeMovieHeader, isUtc: true);
+
+        Assert.Equal(TimeSpan.FromHours(2), DateComparison.ZoneGap(start, Header(17, 52, 46)));   // 32 s de vidéo
+        Assert.Null(DateComparison.ZoneGap(start, Header(18, 0, 30)));                            // 8 min 16 s : trop long
+        Assert.Null(DateComparison.ZoneGap(start, Header(17, 52, 10)));                           // en-tête 4 s AVANT le début
+    }
+
+    [Fact]
+    public void Concordant_AppleDateAndALaterMovieHeader()
+    {
+        var apple = new DateCandidate(new DateTime(2024, 7, 8, 14, 4, 59), DatePrecision.Second, CandidateOrigin.QuickTimeApple, TimeSpan.FromHours(2));
+        DateCandidate Header(int h, int m, int s) => new(new DateTime(2024, 7, 8, h, m, s), DatePrecision.Second, CandidateOrigin.QuickTimeMovieHeader, isUtc: true);
+
+        Assert.True(DateComparison.Concordant(apple, Header(12, 5, 18)));
+        Assert.False(DateComparison.Concordant(apple, Header(12, 13, 0)));
+        Assert.False(DateComparison.Concordant(apple, Header(12, 4, 55)));
+    }
+
+    [Fact]
+    public void Concordant_DayAgainstUtc_AcceptsEveryTimeZone()
+    {
+        var day = new DateCandidate(new DateTime(2023, 9, 1), DatePrecision.Day, CandidateOrigin.FileName);
+
+        Assert.True(DateComparison.Concordant(day, new DateCandidate(new DateTime(2023, 9, 1, 21, 34, 16), DatePrecision.Second, CandidateOrigin.QuickTimeMovieHeader, isUtc: true)));
+        Assert.True(DateComparison.Concordant(day, new DateCandidate(new DateTime(2023, 8, 31, 11, 0, 0), DatePrecision.Second, CandidateOrigin.QuickTimeMovieHeader, isUtc: true)));   // J - 13 h
+        Assert.False(DateComparison.Concordant(day, new DateCandidate(new DateTime(2023, 9, 3, 10, 0, 0), DatePrecision.Second, CandidateOrigin.QuickTimeMovieHeader, isUtc: true)));
+    }
 }

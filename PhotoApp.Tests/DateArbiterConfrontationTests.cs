@@ -40,11 +40,20 @@ public sealed class DateArbiterConfrontationTests
     }
 
     [Fact]
-    public void DeviceName_FarFromTheExif_IsADisagreement()
+    public void DeviceName_EarlierThanTheExifBeyondTheLatency_IsADisagreement()
     {
-        var decision = Decide("IMG_20230304_132015.jpg", dates: Exif(new DateTime(2021, 1, 1, 10, 0, 0)));
+        var decision = Decide("IMG_20230304_132015.jpg", dates: Exif(new DateTime(2023, 3, 4, 14, 0, 0)));
 
         Assert.Equal(Reasons.Disagreement, decision.Reason);
+    }
+
+    [Fact]
+    public void DeviceName_LaterThanTheExif_IsASaveAfterTheShot()
+    {
+        var decision = Decide("IMG_20250704_160803.jpg", "Xiaomi", dates: Exif(new DateTime(2025, 6, 20, 21, 48, 56)));
+
+        Assert.Equal(Reasons.ExifOnly, decision.Reason);
+        Assert.Equal(Confidence.Probable, decision.Confidence);
     }
 
     [Fact]
@@ -88,5 +97,54 @@ public sealed class DateArbiterConfrontationTests
 
         Assert.Equal(Reasons.ProfileName, decision.Reason);
         Assert.Equal(Confidence.Probable, decision.Confidence);
+    }
+
+    [Fact]
+    public void SamsungExif_WrittenSecondsAfterTheName_StaysCertain()
+    {
+        var decision = Decide("20261012_014932.jpg", "samsung", dates: Exif(new DateTime(2026, 10, 12, 1, 49, 34, 625), TimeSpan.FromHours(2)));
+
+        Assert.Equal(Reasons.ExifWithOffset, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+    }
+
+    [Fact]
+    public void XiaomiExifWithoutOffset_WrittenSecondsAfterTheName_IsConcordant()
+    {
+        var decision = Decide("IMG_20230304_132015.jpg", "Xiaomi", dates: Exif(new DateTime(2023, 3, 4, 13, 20, 19)));
+
+        Assert.Equal(Reasons.ExifConcordant, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+    }
+
+    [Fact]
+    public void AndroidVideo_HeaderWrittenAtTheEnd_GivesTheNameAndTheOffset()
+    {
+        var decision = Decide("VID_20231027_195214.mp4", dates: Utc(new DateTime(2023, 10, 27, 17, 52, 46), CandidateOrigin.QuickTimeMovieHeader));
+
+        Assert.Equal(Reasons.VideoUtcName, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+        Assert.Equal(new DateTime(2023, 10, 27, 19, 52, 14), decision.Date?.WallClock);
+        Assert.Equal(TimeSpan.FromHours(2), decision.Date?.Offset);
+    }
+
+    [Fact]
+    public void IPhoneVideo_AppleDateAndLaterHeader_StaysCertain()
+    {
+        var apple = new DateCandidate(new DateTime(2024, 7, 8, 14, 4, 59), DatePrecision.Second, CandidateOrigin.QuickTimeApple, TimeSpan.FromHours(2));
+
+        var decision = Decide("24-07-08 14-05-00 0461.mov", dates: [apple, Utc(new DateTime(2024, 7, 8, 12, 5, 18), CandidateOrigin.QuickTimeMovieHeader)]);
+
+        Assert.Equal(Reasons.QuickTimeApple, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+    }
+
+    [Fact]
+    public void WhatsAppVideo_DayNameAndUtcHeader_StaysCertain()
+    {
+        var decision = Decide("VID-20230901-WA0008.mp4", dates: Utc(new DateTime(2023, 9, 1, 21, 34, 16), CandidateOrigin.QuickTimeMovieHeader));
+
+        Assert.Equal(Reasons.MessagingName, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
     }
 }

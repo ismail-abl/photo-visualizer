@@ -172,12 +172,27 @@ public sealed class DateArbiter
             return true;
         }
 
-        // Transfert : l'EXIF d'un fichier reçu ou téléchargé est plus ancien que son nom.
+        // Latence d'écriture : l'EXIF d'un appareil est écrit quelques secondes après l'heure du nom.
+        if (IsName(primary) && IsExif(other) && DateComparison.ExifMatchesName(other, primary))
+        {
+            return true;
+        }
+
+        if (IsName(other) && IsExif(primary) && DateComparison.ExifMatchesName(primary, other))
+        {
+            return true;
+        }
+
+        // Enregistrement ou transfert postérieur : un nom plus récent que l'EXIF est l'heure d'enregistrement d'une copie
+        // retouchée ou exportée, ou de réception d'un transfert (messagerie, téléchargement), quel que soit le profil.
         return other.Origin == CandidateOrigin.FileName
-               && reading.Profile?.Family is ProfileFamily.Messaging or ProfileFamily.Export
                && primary.Origin is CandidateOrigin.ExifOriginal or CandidateOrigin.ExifDigitized
                && DateComparison.CompareAt(primary, other, other.Precision) <= 0;
     }
+
+    private static bool IsName(DateCandidate candidate) => candidate is { Origin: CandidateOrigin.FileName, IsUtc: false };
+
+    private static bool IsExif(DateCandidate candidate) => candidate.Origin is CandidateOrigin.ExifOriginal or CandidateOrigin.ExifDigitized;
 
     // EXIF sans décalage : Sûr s'il concorde avec le nom d'un profil ou si le GPS en déduit le décalage, Probable sinon.
     private static Choice FromExif(DateCandidate exif, Candidates c, string? reason)
@@ -189,7 +204,7 @@ public sealed class DateArbiter
 
         if (c.ProfileName is { } name)
         {
-            if (!name.IsUtc && DateComparison.Concordant(exif, name))
+            if (!name.IsUtc && DateComparison.ExifMatchesName(exif, name))
             {
                 return new Choice(exif, Confidence.Certain, reason ?? Reasons.ExifConcordant);
             }

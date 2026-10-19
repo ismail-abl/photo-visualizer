@@ -73,6 +73,8 @@ Sont **forts** : EXIF, QuickTime Apple, QuickTime `mvhd`, XMP et le nom lu par u
 - **Concordance** de deux valeurs : écart de 2 s au plus en précision seconde, même minute en précision minute, même jour en précision jour. On compare à la précision la plus faible des deux. Deux valeurs dont le décalage est connu se comparent comme des instants ; deux valeurs locales, comme des heures murales ; une valeur locale sans décalage et une valeur UTC relèvent de l'écart de fuseau ci-dessous.
 - **Écart de fuseau valide** entre une valeur locale et une valeur UTC : multiple de 15 min à 2 s près, d'au plus 14 h en valeur absolue.
 - **Décalage déduit du GPS** : `DateTimeOriginal − GPS`, arrondi au quart d'heure, retenu si le reste est d'au plus 2 min et le décalage d'au plus 14 h.
+- **Latence d'écriture EXIF** : l'EXIF d'un appareil peut être écrit jusqu'à 10 s après l'heure de son nom (mesure réelle : Samsung +2 à +4 s, Xiaomi jusqu'à +10 s) ; l'EXIF et le nom concordent si EXIF − nom ∈ [−2 s, +10 s].
+- **En-tête vidéo `mvhd`** : il est souvent écrit à la fin de l'enregistrement ; il concorde avec l'heure de début s'il la suit de 0 à 7 min (−2 s toléré). Un nom au jour concorde avec une valeur UTC si l'instant tombe dans [J − 14 h, J + 1 j + 12 h[.
 
 Ces valeurs sont des constantes nommées, revues après la mesure de mi-phase.
 
@@ -108,7 +110,7 @@ Confiances : **Sûre** et **Probable** sont applicables ; **Incertaine** part da
 **Étape 2 — confrontation.** Le candidat principal est comparé à chaque autre candidat **fort** :
 
 - s'il y a concordance, ou un écart de fuseau valide entre une valeur locale et une valeur UTC : rien ne change ;
-- si le désaccord est **expliqué** par un transfert (EXIF plus ancien que le nom pour un profil de messagerie ou de téléchargement) : rien ne change, et l'autre valeur reste une information ;
+- si le désaccord est **expliqué** par un enregistrement postérieur (EXIF antérieur ou égal au nom, quel que soit le profil : transfert par messagerie, téléchargement, copie retouchée ou exportée) : rien ne change, et l'autre valeur reste une information ;
 - sinon : la confiance tombe à **Incertaine**, la raison devient `desaccord`, et le drapeau `desaccord` est posé avec les deux valeurs.
 
 La date du fichier ne participe jamais à la confrontation. Pour un profil de messagerie, elle ne peut donc jamais contredire le nom : par exemple, `IMG-20210915-WA0005.jpg` modifié le 2023-03-01 reste daté du 2021-09-15, Sûre.
@@ -142,9 +144,9 @@ Un profil est un enregistrement C# immuable, déclaré dans une table unique (`S
 | Famille | Profils |
 |---|---|
 | Messagerie | WhatsApp `IMG-AAAAMMJJ-WAnnnn` / `VID-…-WAnnnn` (le compteur `counter` sert à l'ordre), `WhatsApp Image AAAA-MM-JJ at HH.mm.ss` ; Signal `signal-AAAA-MM-JJ-HHmmss[_nnn]` ; Telegram `photo_AAAA-MM-JJ_HH-mm-ss` |
-| Appareil | Xiaomi `IMG_AAAAMMJJ_HHmmss` / `VID_…` ; Samsung `AAAAMMJJ_HHmmss` ; Pixel `PXL_AAAAMMJJ_HHmmssSSS` ; Huawei, OnePlus, `MVIMG_` ; Nextcloud iOS `AA-MM-JJ HH-MM-SS NNNN` ; iPhone natif `IMG_nnnn` (sans date dans le nom, reconnu par la marque Apple) |
-| Capture | Android `Screenshot_AAAAMMJJ_HHmmss[_app]` ; Windows `Screenshot AAAA-MM-JJ HHmmss` ; Outil Capture Windows ; GNOME `Capture d’écran du AAAA-MM-JJ HH-mm-ss` et `Screenshot from …` (apostrophes `’` et `'`) ; macOS 12 h et 24 h, en anglais et en français ; KDE Spectacle |
-| Export / téléchargement | WeChat `mmexport<epoch>`, Facebook `FB_IMG_<epoch>` (epoch de 10 ou 13 chiffres, UTC) ; Snapchat et téléchargements (`hqdefault-…`, sans date dans le nom) |
+| Appareil | Xiaomi `IMG_AAAAMMJJ_HHmmss` / `VID_…` ; Samsung `AAAAMMJJ_HHmmss` ; Pixel `PXL_AAAAMMJJ_HHmmssSSS` ; Huawei, OnePlus, `MVIMG_` ; Nextcloud iOS `AA-MM-JJ HH-MM-SS NNNN` (suffixe numérique ou hexadécimal) ; iPhone natif `IMG_nnnn` (sans date dans le nom, reconnu par la marque Apple) |
+| Capture | Android `Screenshot_AAAAMMJJ_HHmmss[_app]` ; Windows `Screenshot AAAA-MM-JJ HHmmss` ; Outil Capture Windows ; GNOME `Capture d’écran du AAAA-MM-JJ HH-mm-ss` et `Screenshot from …` (apostrophes `’` et `'`) ; macOS 12 h et 24 h, en anglais et en français ; KDE Spectacle ; captures de jeu (AMD, Steam…) `Titre_AAAA_MM_JJ_HH_mm_ss_fff` et `Titre JJ.MM.AAAA HH_mm_ss` (jour en premier) |
+| Export / téléchargement | WeChat `mmexport<epoch>`, Facebook `FB_IMG_<epoch>` (epoch de 10 ou 13 chiffres, UTC) ; Snapchat et téléchargements (`hqdefault-…`, sans date dans le nom) ; images collées Obsidian `Pasted image AAAAMMJJHHmmss` |
 
 Les heures en 12 h sont converties ; tout est en 24 h ensuite.
 
@@ -210,7 +212,9 @@ Dès que le moteur et une CLI minimale fonctionnent, la CLI analyse la biblioth�
 2. les profils et les règles sont complétés d'après les motifs inconnus et les désaccords ;
 3. les tolérances du §5.2 sont revues si nécessaire.
 
-**Objectif chiffré :** à fixer à la mesure de mi-phase (décision de l'utilisateur du 2026-10-19).
+**Mesure du 2026-10-19, avant itération :** 9 449 médias (8 955 photos, 494 vidéos) analysés en 3,5 s ; Sûre 80,4 %, Probable 9,0 %, Incertaine 10,6 %, Aucune 0 % — Sûre + Probable : 89,4 %. Lecture seule vérifiée (empreinte des 9 617 fichiers identique avant et après).
+
+**Objectif chiffré :** à fixer par l'utilisateur au vu de la mesure (la mesure et la première itération ont été faites pendant son absence).
 
 ## 13. Tests
 
