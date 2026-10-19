@@ -216,7 +216,7 @@ Dès que le moteur et une CLI minimale fonctionnent, la CLI analyse la biblioth�
 
 **Après la première itération (même jour) :** Sûre 86,6 %, Probable 7,5 %, Incertaine 5,9 %, Aucune 0 % — Sûre + Probable : 94,1 %. Restent Incertaines les photos sans date exploitable : album_japon (EXIF « 0000:00:00 », 123), album_japon_final (sans EXIF, 105), Snapchat (105), téléchargements et mèmes (~200). Lecture seule vérifiée à nouveau.
 
-**Objectif chiffré :** à fixer par l'utilisateur au vu de la mesure (la mesure et la première itération ont été faites pendant son absence).
+**Objectif chiffré :** ≥ 94 % de « Sûre + Probable » sur la bibliothèque réelle, fixé par l'utilisateur le 2026-10-19 au vu de la mesure (94,1 %) : atteint.
 
 ## 13. Tests
 
