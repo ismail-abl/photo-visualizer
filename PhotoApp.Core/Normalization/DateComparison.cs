@@ -48,10 +48,10 @@ public static class DateComparison
         };
     }
 
-    /// <summary>Écart de fuseau valide entre une heure locale et une valeur UTC : multiple de 15 min à 2 s près, au plus 14 h.</summary>
+    /// <summary>Écart de fuseau valide entre une heure locale sans décalage et une valeur UTC : multiple de 15 min à 2 s près, au plus 14 h.</summary>
     public static TimeSpan? ZoneGap(DateCandidate local, DateCandidate utc)
     {
-        if (local.IsUtc || !utc.IsUtc || local.Precision < DatePrecision.Second || utc.Precision < DatePrecision.Second)
+        if (local.IsUtc || local.Offset is not null || !utc.IsUtc || local.Precision < DatePrecision.Second || utc.Precision < DatePrecision.Second)
         {
             return null;
         }

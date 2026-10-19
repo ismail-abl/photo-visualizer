@@ -66,6 +66,12 @@ public sealed class DateComparisonTests
     }
 
     [Fact]
+    public void ZoneGap_IsRefused_WhenTheLocalValueCarriesAnOffset()
+    {
+        Assert.Null(DateComparison.ZoneGap(Local(17, 7, 10, TimeSpan.FromHours(2)), Utc(12, 7, 10)));   // heure locale sans décalage seulement
+    }
+
+    [Fact]
     public void OffsetFromGps_RoundsToAQuarterHour_WithinTwoMinutes()
     {
         var exif = Local(13, 20, 15);

@@ -48,6 +48,15 @@ public sealed class DateArbiterConfrontationTests
     }
 
     [Fact]
+    public void ExifWithOffset_ContradictingTheVideoHeader_IsADisagreement()
+    {
+        var decision = Decide("photo.mov", dates: [Exif(new DateTime(2024, 7, 11, 17, 7, 10), TimeSpan.FromHours(2)), Utc(new DateTime(2024, 7, 11, 12, 7, 10), CandidateOrigin.QuickTimeMovieHeader)]);
+
+        Assert.Equal(Reasons.Disagreement, decision.Reason);
+        Assert.Equal(Confidence.Uncertain, decision.Confidence);
+    }
+
+    [Fact]
     public void AgreeingSources_StayCertain()
     {
         var apple = new DateCandidate(new DateTime(2024, 7, 11, 17, 7, 10), DatePrecision.Second, CandidateOrigin.QuickTimeApple, TimeSpan.FromHours(2));
