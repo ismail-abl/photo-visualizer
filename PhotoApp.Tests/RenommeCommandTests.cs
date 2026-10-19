@@ -123,6 +123,88 @@ public sealed class RenommeCommandTests
     }
 
     [Fact]
+    public void Apply_InvokesExecutionStarting_OnceAndBeforeAnyFileChanges()
+    {
+        using var temp = new TempDirectory();
+        var photos = Library(temp);
+        var paths = PathsUnder(temp.Combine("data"));
+        var calls = 0;
+        var oldNameStillThere = false;
+        var newNameAbsent = false;
+        var noBatchYet = false;
+
+        var exitCode = Command(paths, new StringWriter(), new StringWriter()).Run(
+            Request(photos, apply: true, yes: true),
+            executionStarting: () =>
+            {
+                calls++;
+                oldNameStillThere = File.Exists(Path.Combine(photos, "holiday.jpg"));
+                newNameAbsent = !File.Exists(Path.Combine(photos, "IMG-20230304-132015.jpg"));
+                noBatchYet = OpenJournal(paths).ListBatches().Count == 0;
+            });
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        Assert.Equal(1, calls);
+        Assert.True(oldNameStillThere);
+        Assert.True(newNameAbsent);
+        Assert.True(noBatchYet);
+        Assert.True(File.Exists(Path.Combine(photos, "IMG-20230304-132015.jpg")));   // le lot a bien été exécuté ensuite
+    }
+
+    [Fact]
+    public void Apply_AfterAConfirmedPrompt_InvokesExecutionStarting()
+    {
+        using var temp = new TempDirectory();
+        var photos = Library(temp);
+        var calls = 0;
+
+        Command(PathsUnder(temp.Combine("data")), new StringWriter(), new StringWriter(), "o\n")
+            .Run(Request(photos, apply: true), executionStarting: () => calls++);
+
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public void DryRun_DoesNotInvokeExecutionStarting()
+    {
+        using var temp = new TempDirectory();
+        var photos = Library(temp);
+        var calls = 0;
+
+        Command(PathsUnder(temp.Combine("data")), new StringWriter(), new StringWriter())
+            .Run(Request(photos), executionStarting: () => calls++);
+
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public void DeclinedConfirmation_DoesNotInvokeExecutionStarting()
+    {
+        using var temp = new TempDirectory();
+        var photos = Library(temp);
+        var calls = 0;
+
+        Command(PathsUnder(temp.Combine("data")), new StringWriter(), new StringWriter(), "n\n")
+            .Run(Request(photos, apply: true), executionStarting: () => calls++);
+
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public void NothingToRename_DoesNotInvokeExecutionStarting()
+    {
+        using var temp = new TempDirectory();
+        var photos = Photos(temp);
+        TestImages.WriteJpeg(Path.Combine(photos, "blank.jpg"));
+        var calls = 0;
+
+        Command(PathsUnder(temp.Combine("data")), new StringWriter(), new StringWriter())
+            .Run(Request(photos, apply: true, yes: true), executionStarting: () => calls++);
+
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
     public void Slice_KeepsTheFirstGroupsOnly()
     {
         using var temp = new TempDirectory();

@@ -23,7 +23,11 @@ public sealed class RenommeCommand(AppDataPaths paths, TextWriter output, TextWr
 
     private readonly Func<DateTime> _localNow = localNow ?? (() => DateTime.Now);
 
-    public int Run(RenommeRequest request, CancellationToken cancellation = default)
+    /// <param name="executionStarting">
+    /// Appelé une seule fois, juste avant l'exécution du lot (donc après la confirmation, jamais pour un aperçu, un abandon
+    /// ou un plan vide) : la CLI n'intercepte Ctrl+C qu'à partir de là, car avant, rien n'est encore écrit et l'arrêt immédiat est sans risque.
+    /// </param>
+    public int Run(RenommeRequest request, CancellationToken cancellation = default, Action? executionStarting = null)
     {
         if (request.Slice is <= 0)
         {
@@ -100,6 +104,7 @@ public sealed class RenommeCommand(AppDataPaths paths, TextWriter output, TextWr
             return ExitCodes.Success;
         }
 
+        executionStarting?.Invoke();
         BatchRunSummary summary;
         try
         {
