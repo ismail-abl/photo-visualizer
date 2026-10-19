@@ -1,4 +1,6 @@
 using ImageMagick;
+using PhotoApp.Core.Models;
+using PhotoApp.Metadata;
 
 namespace PhotoApp.Tests;
 
@@ -56,7 +58,8 @@ public sealed class ImageConverterTests
 
         new ImageConverter().ConvertToJpeg(input, output, 90);
 
-        var date = new NativeImageMetadataReader().Read(output);
+        var date = new MetadataReader().Read(output).Dates
+            .FirstOrDefault(candidate => candidate.Origin == CandidateOrigin.ExifOriginal);
         Assert.NotNull(date);
         Assert.Equal(new DateTime(2023, 3, 4, 13, 20, 15), date.WallClock);
     }

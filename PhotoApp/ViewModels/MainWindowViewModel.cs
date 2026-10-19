@@ -9,8 +9,6 @@ using CommunityToolkit.Mvvm.Input;
 using PhotoApp.Catalog;
 using PhotoApp.Core;
 using PhotoApp.Core.Models;
-using PhotoApp.Core.Services;
-using PhotoApp.Metadata;
 using PhotoApp.Operations;
 
 namespace PhotoApp.ViewModels;
@@ -20,8 +18,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private const string OutputFolderName = "Converted";
     private const int JpegQuality = 90;
 
-    private readonly MediaScanner _mediaScanner = new();
-    private readonly ImageDateResolver _imageDateResolver = new();
+    private readonly MediaAnalyzer _mediaAnalyzer = new();
     private readonly ConversionService _conversionService = new();
     private readonly AppDataPaths _dataPaths = AppDataPaths.ForCurrentUser();
 
@@ -97,24 +94,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var outputFolder = Path.Combine(root, OutputFolderName);
 
-        // L'interface ne traite que les photos en phase 1 ; les vidéos arrivent en phase 2.
-        var scanned = _mediaScanner.Scan(root, new ScanOptions([outputFolder])).Media
-            .Where(media => SupportedMediaExtensions.IsPhoto(media.Extension))
+        // Le moteur voit tout le dossier (voisins, Live Photo) ; l'interface ne traite que les photos en phase 1.
+        return _mediaAnalyzer.Analyze([root], [outputFolder]).Results
+            .Where(result => result.Kind == MediaKind.Photo)
+            .Select(ImageFileInfo.FromResult)
+            .OrderBy(image => image.FileName, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var resolved = new ImageFileInfo[scanned.Count];
-
-        Parallel.For(0, scanned.Count, index =>
-        {
-            var media = scanned[index];
-            resolved[index] = new ImageFileInfo(
-                media.FullPath,
-                media.FileName,
-                media.Extension,
-                media.SizeBytes,
-                _imageDateResolver.Resolve(media.FullPath));
-        });
-
-        return resolved.OrderBy(image => image.FileName, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     partial void OnSelectedFolderPathChanged(string? value) => RefreshCommandState();

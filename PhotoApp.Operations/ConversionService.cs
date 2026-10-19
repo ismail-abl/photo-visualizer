@@ -35,7 +35,8 @@ public sealed class ConversionService
 
         foreach (var image in images)
         {
-            if (image.DateMetadata is not { IsReliable: true, RetainedCandidate: { } date })
+            // Seules les dates Sûre et Probable sont appliquées ; Incertaine et Aucune restent « À vérifier ».
+            if (image.Decision is not { IsApplicable: true, Date: { } date })
             {
                 skippedUnreliable++;
                 continue;

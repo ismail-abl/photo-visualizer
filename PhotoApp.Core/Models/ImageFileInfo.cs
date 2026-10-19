@@ -1,5 +1,9 @@
+using PhotoApp.Core.Normalization;
+using PhotoApp.Core.Services;
+
 namespace PhotoApp.Core.Models;
 
+/// <summary>Une photo de l'interface, avec la décision du moteur. Seules Sûre et Probable sont appliquées.</summary>
 public sealed class ImageFileInfo
 {
     public ImageFileInfo(
@@ -7,13 +11,13 @@ public sealed class ImageFileInfo
         string fileName,
         string extension,
         long fileSizeBytes,
-        ImageDateMetadata? dateMetadata = null)
+        DateDecision? decision = null)
     {
         FullPath = fullPath;
         FileName = fileName;
         Extension = extension;
         FileSizeBytes = fileSizeBytes;
-        DateMetadata = dateMetadata;
+        Decision = decision;
     }
 
     public string FullPath { get; }
@@ -24,13 +28,28 @@ public sealed class ImageFileInfo
 
     public long FileSizeBytes { get; }
 
-    public ImageDateMetadata? DateMetadata { get; }
+    public DateDecision? Decision { get; }
 
-    public string RetainedDateText => DateMetadata?.RetainedDateText ?? "—";
+    public string RetainedDateText => Decision?.Date is { } date ? DecisionTexts.FormatDate(date) : "—";
 
-    public string RetainedDateSourceText => DateMetadata?.RetainedSourceText ?? "Aucune";
+    public string DecisionText => Decision is null
+        ? DecisionTexts.ConfidenceLabel(Confidence.None)
+        : $"{DecisionTexts.ConfidenceLabel(Decision.Confidence)} — {DecisionTexts.ReasonLabel(Decision.Reason)}";
 
-    public string? NormalizedFileNamePreview => DateMetadata?.NormalizedFileNamePreview;
+    public string? NormalizedFileNamePreview =>
+        Decision is { IsApplicable: true, Date: { } date } ? NormalizedFileNameBuilder.Preview(date) : null;
 
-    public string StatusText => DateMetadata?.StatusText ?? string.Empty;
+    public string StatusText => Decision switch
+    {
+        null or { IsApplicable: true } => string.Empty,
+        { Confidence: Confidence.Uncertain } => "À vérifier : " + DecisionTexts.ReasonLabel(Decision.Reason),
+        _ => "Aucune date fiable : " + DecisionTexts.ReasonLabel(Decision.Reason)
+    };
+
+    public static ImageFileInfo FromResult(MediaResult result) => new(
+        result.Facts.File.FullPath,
+        result.Facts.File.FileName,
+        result.Facts.File.Extension,
+        result.Facts.File.SizeBytes,
+        result.Decision);
 }

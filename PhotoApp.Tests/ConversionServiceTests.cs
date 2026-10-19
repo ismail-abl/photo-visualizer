@@ -1,17 +1,15 @@
+using PhotoApp.Catalog;
 using PhotoApp.Core.Models;
 
 namespace PhotoApp.Tests;
 
 public sealed class ConversionServiceTests
 {
-    private static IReadOnlyList<ImageFileInfo> ScanAndResolve(string root, string outputFolder)
-    {
-        var resolver = new ImageDateResolver();
-        return new MediaScanner()
-            .Scan(root, new ScanOptions([outputFolder])).Media
-            .Select(m => new ImageFileInfo(m.FullPath, m.FileName, m.Extension, m.SizeBytes, resolver.Resolve(m.FullPath)))
+    private static IReadOnlyList<ImageFileInfo> ScanAndResolve(string root, string outputFolder) =>
+        new MediaAnalyzer().Analyze([root], [outputFolder]).Results
+            .Where(result => result.Kind == MediaKind.Photo)
+            .Select(ImageFileInfo.FromResult)
             .ToList();
-    }
 
     private static string[] OutputNames(string outputFolder) =>
         Directory.GetFiles(outputFolder).Select(path => Path.GetFileName(path)).Order(StringComparer.Ordinal).ToArray();
@@ -72,7 +70,7 @@ public sealed class ConversionServiceTests
     }
 
     [Fact]
-    public void CorruptFile_FailsAlone_AndLeavesNoOrphan()
+    public void UnreadableFile_IsNotConverted_AndTheOthersAre()
     {
         using var temp = new TempDirectory();
         var root = temp.Combine("photos");
@@ -85,9 +83,28 @@ public sealed class ConversionServiceTests
         var summary = new ConversionService().Run(ScanAndResolve(root, output), output, manifestPath, 90, false);
 
         Assert.Equal(1, summary.Converted);
-        Assert.Equal(1, summary.Failed);
-        Assert.NotNull(summary.FirstError);
+        Assert.Equal(0, summary.Failed);
+        Assert.Equal(1, summary.SkippedUnreliableDate);
         Assert.Equal(["IMG-20240410-111652.jpg"], OutputNames(output));
+    }
+
+    [Fact]
+    public void UncertainDates_AreNeverApplied()
+    {
+        using var temp = new TempDirectory();
+        var root = temp.Combine("photos");
+        var output = Path.Combine(root, "Converted");
+        var manifestPath = temp.Combine("data", "manifest.json");
+        Directory.CreateDirectory(root);
+        TestImages.WritePng(Path.Combine(root, "03-04-2025 10-00-00.png"));   // JJ/MM ambigu
+        TestImages.WritePng(Path.Combine(root, "scan 20190501.png"));         // jour seul, nom générique
+        TestImages.WritePng(Path.Combine(root, "random.png"));                // seulement la date du fichier
+
+        var summary = new ConversionService().Run(ScanAndResolve(root, output), output, manifestPath, 90, false);
+
+        Assert.Equal(0, summary.Converted);
+        Assert.Equal(3, summary.SkippedUnreliableDate);
+        Assert.Empty(OutputNames(output));
     }
 
     [Fact]
