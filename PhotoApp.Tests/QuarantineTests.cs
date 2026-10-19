@@ -59,6 +59,55 @@ public sealed class QuarantineTests
     }
 
     [Fact]
+    public void Hold_WhenTheLogFails_PutsTheFileBack_AndRemovesItsFolder_AndRethrows()
+    {
+        using var temp = new TempDirectory();
+        var root = temp.Combine("quarantine");
+        Directory.CreateDirectory(root);
+        var log = new ThrowingQuarantineLog();
+        var quarantine = new Quarantine(root, log, () => Now);
+        var path = WriteFile(Photos(temp), "a.jpg", "A");
+
+        var error = Assert.Throws<InvalidOperationException>(() => quarantine.Hold(path, batchId: 3));
+
+        Assert.Equal("base verrouillée", error.Message);
+        Assert.Equal(1, log.AddCalls);
+        Assert.Equal("A", File.ReadAllText(path));
+        Assert.Empty(Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories));
+        Assert.Empty(Directory.GetDirectories(root).SelectMany(Directory.GetDirectories));   // plus de dossier <date>\<guid>
+        Assert.Empty(log.List());
+    }
+
+    [Fact]
+    public void Hold_WhenTheLogFails_AndTheFileCannotBePutBack_ThrowsAnIOExceptionNamingTheStoredPath()
+    {
+        using var temp = new TempDirectory();
+        var root = temp.Combine("quarantine");
+        Directory.CreateDirectory(root);
+        var quarantine = new Quarantine(root, new ThrowingQuarantineLog(), () => Now);
+        var path = WriteFile(Photos(temp), "a.jpg", "A");
+        var moves = 0;
+
+        var error = Assert.Throws<IOException>(() => quarantine.Hold(path, null, (from, to) =>
+        {
+            if (++moves > 1)
+            {
+                throw new IOException("remise en place impossible");   // le déplacement aller a réussi, pas le retour
+            }
+
+            File.Move(from, to, overwrite: false);
+        }));
+
+        var stored = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Single();
+        Assert.Contains(stored, error.Message);
+        Assert.Contains("remise en place impossible", error.Message);
+        var original = Assert.IsType<InvalidOperationException>(error.InnerException);
+        Assert.Equal("base verrouillée", original.Message);
+        Assert.Equal("A", File.ReadAllText(stored));
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
     public void Hold_MissingFile_Throws()
     {
         using var temp = new TempDirectory();
@@ -139,5 +188,25 @@ public sealed class QuarantineTests
         Assert.Equal(QuarantineState.Purged, log.Get(old.Id)!.State);
         Assert.Equal(QuarantineState.Held, log.Get(recent.Id)!.State);
         Assert.True(File.Exists(recent.StoredPath));
+    }
+
+    /// <summary>Un journal dont l'enregistrement échoue toujours : sert à vérifier que <c>Hold</c> défait son déplacement.</summary>
+    private sealed class ThrowingQuarantineLog : IQuarantineLog
+    {
+        public int AddCalls { get; private set; }
+
+        public long Add(DateTime createdUtc, string originalPath, string storedPath, long? batchId)
+        {
+            AddCalls++;
+            throw new InvalidOperationException("base verrouillée");
+        }
+
+        public QuarantineEntry? Get(long id) => null;
+
+        public IReadOnlyList<QuarantineEntry> List(QuarantineState? state = null) => [];
+
+        public void SetState(long id, QuarantineState state)
+        {
+        }
     }
 }
