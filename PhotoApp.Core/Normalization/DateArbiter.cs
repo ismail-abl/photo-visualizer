@@ -79,6 +79,18 @@ public sealed class DateArbiter
 
         if (family == ProfileFamily.Screenshot && profileName is not null)
         {
+            // Le nom d'une capture est l'heure d'enregistrement : une métadonnée antérieure est l'heure réelle de la capture
+            // (même principe qu'un appareil dont le fichier édité garde l'EXIF d'origine).
+            if (profileName.IsUtc is false)
+            {
+                var earlier = new[] { exif, c.Xmp }.FirstOrDefault(
+                    meta => meta is not null && DateComparison.CompareAt(meta, profileName, profileName.Precision) < 0);
+                if (earlier is not null)
+                {
+                    return new Choice(earlier, Confidence.Certain, Reasons.ExifBeforeName);
+                }
+            }
+
             return new Choice(profileName, Confidence.Certain, Reasons.ScreenshotName);
         }
 
@@ -191,7 +203,7 @@ public sealed class DateArbiter
         // Enregistrement ou transfert postérieur : un nom plus récent que l'EXIF est l'heure d'enregistrement d'une copie
         // retouchée ou exportée, ou de réception d'un transfert (messagerie, téléchargement), quel que soit le profil.
         return other.Origin == CandidateOrigin.FileName
-               && primary.Origin is CandidateOrigin.ExifOriginal or CandidateOrigin.ExifDigitized
+               && primary.Origin is CandidateOrigin.ExifOriginal or CandidateOrigin.ExifDigitized or CandidateOrigin.Xmp or CandidateOrigin.XmpSidecar
                && DateComparison.CompareAt(primary, other, other.Precision) <= 0;
     }
 

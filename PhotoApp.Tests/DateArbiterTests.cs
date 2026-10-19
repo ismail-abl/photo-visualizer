@@ -72,12 +72,13 @@ public sealed class DateArbiterTests
     }
 
     [Fact]
-    public void ScreenshotName_LaterThanTheExif_IsStillADisagreement()
+    public void ScreenshotName_LaterThanTheExif_ExifIsTheCaptureTime()
     {
         var decision = Decide("Screenshot 2025-08-27 211650.png", dates: Exif(new DateTime(2025, 8, 1, 9, 0, 0)));
 
-        Assert.Equal(Reasons.Disagreement, decision.Reason);
-        Assert.Equal(Confidence.Uncertain, decision.Confidence);
+        Assert.Equal(Reasons.ExifBeforeName, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+        Assert.Equal(new DateTime(2025, 8, 1, 9, 0, 0), decision.Date?.WallClock);
     }
 
     [Fact]
@@ -315,5 +316,60 @@ public sealed class DateArbiterTests
 
         Assert.Equal(Reasons.ScreenshotName, decision.Reason);
         Assert.Equal(Confidence.Certain, decision.Confidence);
+    }
+
+    private static DateCandidate Xmp(DateTime value) =>
+        new(value, DatePrecision.SubSecond, CandidateOrigin.Xmp);
+
+    [Fact]
+    public void Screenshot_WithAnEarlierXmp_TakesTheXmp()
+    {
+        var decision = Decide("Screenshot 2025-05-19 224500.png", dates: Xmp(new DateTime(2025, 5, 19, 22, 44, 46, 79)));
+
+        Assert.Equal(Reasons.ExifBeforeName, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+        Assert.Equal(new DateTime(2025, 5, 19, 22, 44, 46, 79), decision.Date?.WallClock);
+        Assert.False(decision.Flags.HasFlag(DecisionFlags.Disagreement));
+    }
+
+    [Fact]
+    public void Screenshot_WithAnEarlierExif_TakesTheExif()
+    {
+        var decision = Decide("Screenshot 2025-05-19 224500.png", dates: Exif(new DateTime(2025, 5, 19, 22, 40, 0)));
+
+        Assert.Equal(Reasons.ExifBeforeName, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+        Assert.Equal(new DateTime(2025, 5, 19, 22, 40, 0), decision.Date?.WallClock);
+    }
+
+    [Fact]
+    public void Screenshot_WithALaterExif_StaysInDisagreement()
+    {
+        var decision = Decide("Screenshot 2025-05-19 224500.png", dates: Exif(new DateTime(2025, 5, 20, 8, 0, 0)));
+
+        Assert.Equal(Reasons.Disagreement, decision.Reason);
+        Assert.Equal(Confidence.Uncertain, decision.Confidence);
+    }
+
+    [Fact]
+    public void Screenshot_WithoutMetadata_KeepsTheNameAsTheCaptureTime()
+    {
+        var decision = Decide("Screenshot 2025-05-19 224500.png");
+
+        Assert.Equal(Reasons.ScreenshotName, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+        Assert.Equal(new DateTime(2025, 5, 19, 22, 45, 0), decision.Date?.WallClock);
+    }
+
+    [Fact]
+    public void BareEpochName_IsProbable_AndLocalizedFromUtc()
+    {
+        // 1700000000 s = 2023-11-14 22:13:20 UTC ; le fuseau de test est UTC+1.
+        var decision = Decide("1700000000.jpg");
+
+        Assert.Equal(Reasons.ProfileName, decision.Reason);
+        Assert.Equal(Confidence.Probable, decision.Confidence);
+        Assert.Equal(new DateTime(2023, 11, 14, 23, 13, 20), decision.Date?.WallClock);
+        Assert.True(decision.Flags.HasFlag(DecisionFlags.AssumedZone));
     }
 }
