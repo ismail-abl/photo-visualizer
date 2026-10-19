@@ -21,13 +21,22 @@ public sealed class BatchPlanner(TimeZoneInfo? zone = null)
 
     private readonly TimeZoneInfo _zone = zone ?? TimeZoneInfo.Local;
 
+    // Un média retenu avec la date que prendront ses fichiers.
+    private sealed record Candidate(MediaResult Result, DateCandidate Date);
+
     public BatchPlan Plan(IReadOnlyList<MediaResult> results, int? maxGroups = null)
     {
         var alreadyConforming = 0;
-        var candidates = new List<MediaResult>();
+        var candidates = new List<Candidate>();
+        var allByPath = new Dictionary<string, MediaResult>(StringComparer.Ordinal);
         foreach (var result in results)
         {
-            if (result.Decision is not { IsApplicable: true, Date: not null } || result.ProposedName is null)
+            allByPath.TryAdd(result.Facts.File.FullPath, result);
+        }
+
+        foreach (var result in results)
+        {
+            if (result.ProposedName is null || DateOf(result, allByPath) is not { } date)
             {
                 continue;
             }
@@ -38,7 +47,7 @@ public sealed class BatchPlanner(TimeZoneInfo? zone = null)
             }
             else
             {
-                candidates.Add(result);
+                candidates.Add(new Candidate(result, date));
             }
         }
 
@@ -53,18 +62,18 @@ public sealed class BatchPlanner(TimeZoneInfo? zone = null)
         var deferred = 0;
         for (var index = 0; index < groups.Count; index++)
         {
-            var members = groups[index].OrderBy(member => member.Kind).ToList();   // la photo avant sa vidéo
-            foreach (var member in members)
+            var members = groups[index].OrderBy(member => member.Result.Kind).ToList();   // la photo avant sa vidéo
+            foreach (var (media, date) in members)
             {
-                var file = member.Facts.File;
+                var file = media.Facts.File;
                 var folder = Path.GetDirectoryName(file.FullPath) ?? string.Empty;
-                var decided = member.Decision.Date!.ToInstant(_zone);
-                var role = members.Count > 1 && member.Kind == MediaKind.Video ? ItemRole.LivePartner : ItemRole.Media;
+                var decided = date.ToInstant(_zone);
+                var role = members.Count > 1 && media.Kind == MediaKind.Video ? ItemRole.LivePartner : ItemRole.Media;
 
                 items.Add(new BatchItemDraft(
-                    items.Count, index + 1, role, file.FullPath, Path.Combine(folder, member.ProposedName!), decided,
+                    items.Count, index + 1, role, file.FullPath, Path.Combine(folder, media.ProposedName!), decided,
                     file.SizeBytes, file.LastWriteUtc, CreationOf(file.FullPath, file.LastWriteUtc)));
-                if (DeferredExtensions.Contains(Path.GetExtension(member.ProposedName!)))
+                if (DeferredExtensions.Contains(Path.GetExtension(media.ProposedName!)))
                 {
                     deferred++;
                 }
@@ -77,7 +86,7 @@ public sealed class BatchPlanner(TimeZoneInfo? zone = null)
                         continue;
                     }
 
-                    var newName = SidecarNames.Rename(file.FileName, member.ProposedName!, Path.GetFileName(sidecar));
+                    var newName = SidecarNames.Rename(file.FileName, media.ProposedName!, Path.GetFileName(sidecar));
                     var info = new FileInfo(sidecar);
                     if (newName is null || !info.Exists)
                     {
@@ -94,26 +103,48 @@ public sealed class BatchPlanner(TimeZoneInfo? zone = null)
         return new BatchPlan(items, new PlanSummary(alreadyConforming, items.Count, groups.Count, deferred));
     }
 
-    // Ordre stable (chemin), un groupe par média, les deux moitiés d'une Live Photo ensemble.
-    private static List<List<MediaResult>> BuildGroups(List<MediaResult> candidates)
+    // La date d'un média : sa propre décision si elle est applicable. Sinon, une vidéo Live Photo à laquelle le moteur a quand même
+    // proposé le nom de sa photo (phase 1) prend la date de cette photo, pour que les deux moitiés restent ensemble.
+    private static DateCandidate? DateOf(MediaResult result, Dictionary<string, MediaResult> allByPath)
     {
-        var ordered = candidates.OrderBy(result => result.Facts.File.FullPath, StringComparer.Ordinal).ToList();
-        var byPath = ordered.ToDictionary(result => result.Facts.File.FullPath, StringComparer.Ordinal);
-        var grouped = new HashSet<string>(StringComparer.Ordinal);
-        var groups = new List<List<MediaResult>>();
-
-        foreach (var result in ordered)
+        if (result.Decision is { IsApplicable: true, Date: { } own })
         {
-            var path = result.Facts.File.FullPath;
+            return own;
+        }
+
+        if (result.LivePhotoPartner is { } partner
+            && allByPath.TryGetValue(PartnerPath(result, partner), out var mate)
+            && mate.Decision is { IsApplicable: true, Date: { } followed })
+        {
+            return followed;
+        }
+
+        return null;
+    }
+
+    private static string PartnerPath(MediaResult result, string partner) =>
+        Path.Combine(Path.GetDirectoryName(result.Facts.File.FullPath) ?? string.Empty, partner);
+
+    // Ordre stable (chemin), un groupe par média, les deux moitiés d'une Live Photo ensemble.
+    private static List<List<Candidate>> BuildGroups(List<Candidate> candidates)
+    {
+        var ordered = candidates.OrderBy(candidate => candidate.Result.Facts.File.FullPath, StringComparer.Ordinal).ToList();
+        var byPath = ordered.ToDictionary(candidate => candidate.Result.Facts.File.FullPath, StringComparer.Ordinal);
+        var grouped = new HashSet<string>(StringComparer.Ordinal);
+        var groups = new List<List<Candidate>>();
+
+        foreach (var candidate in ordered)
+        {
+            var path = candidate.Result.Facts.File.FullPath;
             if (!grouped.Add(path))
             {
                 continue;
             }
 
-            var group = new List<MediaResult> { result };
-            if (result.LivePhotoPartner is { } partner)
+            var group = new List<Candidate> { candidate };
+            if (candidate.Result.LivePhotoPartner is { } partner)
             {
-                var partnerPath = Path.Combine(Path.GetDirectoryName(path) ?? string.Empty, partner);
+                var partnerPath = PartnerPath(candidate.Result, partner);
                 if (byPath.TryGetValue(partnerPath, out var mate) && grouped.Add(partnerPath))
                 {
                     group.Add(mate);

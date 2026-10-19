@@ -119,6 +119,57 @@ public sealed class BatchPlannerTests
         Assert.Equal(new PlanSummary(0, 3, 1, 1), plan.Summary);   // la HEIC est comptée « conversion différée »
     }
 
+    private static (IReadOnlyList<MediaResult> Results, string Aae) LivePairWhoseVideoHasNoApplicableDecision(TempDirectory temp)
+    {
+        var aae = temp.Combine("IMG_0477.AAE");
+        File.WriteAllText(aae, "x");
+        var photoDate = new DateCandidate(new DateTime(2024, 7, 11, 17, 7, 10), DatePrecision.Second, CandidateOrigin.ExifOriginal, TimeSpan.FromHours(2));
+        var results = Analyze(
+            Facts(temp.Combine("IMG_0477.HEIC"), new RawMetadata { Dates = [photoDate], Make = "Apple", ContentIdentifier = "ID-1", DetectedExtension = "heic" }, [aae]),
+            Facts(temp.Combine("IMG_0477.MOV"), new RawMetadata { Make = "Apple", ContentIdentifier = "ID-1", DetectedExtension = "mov" }, [aae]));
+
+        // Le moteur propose bien un nom à la vidéo (celui de sa photo) alors que sa propre décision n'est pas applicable.
+        var video = results.Single(result => result.Kind == MediaKind.Video);
+        Assert.False(video.Decision.IsApplicable);
+        Assert.Equal("IMG-20240711-170710.mov", video.ProposedName);
+        Assert.Equal("IMG_0477.HEIC", video.LivePhotoPartner);
+        return (results, aae);
+    }
+
+    [Fact]
+    public void Plan_ALiveVideoWithoutItsOwnApplicableDecision_FollowsItsPhoto_InTheSameGroup()
+    {
+        using var temp = new TempDirectory();
+        var (results, _) = LivePairWhoseVideoHasNoApplicableDecision(temp);
+
+        var plan = Plan(results);
+
+        Assert.Equal(["IMG_0477.HEIC", "IMG_0477.AAE", "IMG_0477.MOV"], plan.Items.Select(item => Path.GetFileName(item.SourcePath)));
+        Assert.Equal(["IMG-20240711-170710.heic", "IMG-20240711-170710.AAE", "IMG-20240711-170710.mov"], plan.Items.Select(item => Path.GetFileName(item.TargetPath)));
+        Assert.Equal([ItemRole.Media, ItemRole.Sidecar, ItemRole.LivePartner], plan.Items.Select(item => item.Role));
+        Assert.Single(plan.Items.Select(item => item.GroupId).Distinct());
+        var expected = new DateTimeOffset(2024, 7, 11, 17, 7, 10, TimeSpan.FromHours(2));
+        Assert.All(plan.Items, item => Assert.Equal(expected, item.DecidedDate));   // la vidéo prend l'instant de sa photo
+        Assert.Equal(new PlanSummary(0, 3, 1, 1), plan.Summary);
+    }
+
+    [Fact]
+    public void Plan_ALiveVideoWithoutItsOwnApplicableDecision_IsLeftWhenItsPartnerIsNotPlannable()
+    {
+        using var temp = new TempDirectory();
+        var (results, _) = LivePairWhoseVideoHasNoApplicableDecision(temp);
+        var photo = results.Single(result => result.Kind == MediaKind.Photo);
+        var video = results.Single(result => result.Kind == MediaKind.Video);
+
+        var withoutPhoto = Plan([video]);
+        var photoNotApplicable = Plan([photo with { Decision = photo.Decision with { Confidence = Confidence.Uncertain } }, video]);
+
+        Assert.Empty(withoutPhoto.Items);
+        Assert.Equal(new PlanSummary(0, 0, 0, 0), withoutPhoto.Summary);
+        Assert.Empty(photoNotApplicable.Items);
+        Assert.Equal(new PlanSummary(0, 0, 0, 0), photoNotApplicable.Summary);
+    }
+
     [Fact]
     public void Plan_MaxGroups_KeepsTheFirstGroupsOnly()
     {
