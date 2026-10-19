@@ -46,12 +46,13 @@ public sealed class AnalyseCommandTests
     }
 
     [Fact]
-    public void Run_MalformedFile_DoesNotStopTheAnalysis()
+    public void Run_MalformedGps_KeepsTheFileAndFlagsTheIgnoredSource()
     {
         using var temp = new TempDirectory();
         var photos = CreateLibrary(temp);
         TestImages.WriteJpegWithExif(Path.Combine(photos, "bad.jpg"), exif =>
         {
+            exif.SetValue(ImageMagick.ExifTag.DateTimeOriginal, "2023:03:04 13:20:15");
             exif.SetValue(ImageMagick.ExifTag.GPSDateStamp, "2023:03:04");
             exif.SetValue(ImageMagick.ExifTag.GPSTimestamp, [new ImageMagick.Rational(10, 0), new ImageMagick.Rational(0, 1), new ImageMagick.Rational(0, 1)]);
         });
@@ -63,7 +64,26 @@ public sealed class AnalyseCommandTests
         Assert.Equal(ExitCodes.Success, exitCode);
         var lines = File.ReadAllLines(report);
         Assert.Equal(5, lines.Length);   // en-tête + 4 médias
-        Assert.Contains(lines, line => line.Contains("bad.jpg") && line.Contains(Reasons.ReadFailed));
+        var bad = Assert.Single(lines, line => line.Contains("bad.jpg"));
+        Assert.DoesNotContain(Reasons.ReadFailed, bad);
+        Assert.Contains("source-ignoree", bad);
+    }
+
+    [Fact]
+    public void Run_UnreadableFile_DoesNotStopTheAnalysis()
+    {
+        using var temp = new TempDirectory();
+        var photos = CreateLibrary(temp);
+        File.WriteAllBytes(Path.Combine(photos, "broken.jpg"), [1, 2, 3, 4]);
+        var report = temp.Combine("rapport.csv");
+
+        var exitCode = new AnalyseCommand(PathsUnder(temp.Combine("data")), new StringWriter(), new StringWriter())
+            .Run(new AnalyseRequest([photos], report, []));
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var lines = File.ReadAllLines(report);
+        Assert.Equal(5, lines.Length);   // en-tête + 4 médias
+        Assert.Contains(lines, line => line.Contains("broken.jpg") && line.Contains(Reasons.ReadFailed));
     }
 
     [Fact]

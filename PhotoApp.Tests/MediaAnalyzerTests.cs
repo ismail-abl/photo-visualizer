@@ -71,7 +71,7 @@ public sealed class MediaAnalyzerTests
     }
 
     [Fact]
-    public void Analyze_MalformedFile_DoesNotStopTheAnalysis()
+    public void Analyze_MalformedGps_DoesNotStopTheAnalysis_AndFlagsTheIgnoredSource()
     {
         using var temp = new TempDirectory();
         TestImages.WriteJpeg(temp.Combine("holiday.jpg"), "2023:03:04 13:20:15");
@@ -84,6 +84,8 @@ public sealed class MediaAnalyzerTests
         var analysis = new MediaAnalyzer().Analyze([temp.FullPath], [], options: Options);
 
         Assert.Equal(2, analysis.Results.Count);
-        Assert.Equal(Reasons.ReadFailed, analysis.Results.Single(r => r.Facts.File.FileName == "bad.jpg").Decision.Reason);
+        var bad = analysis.Results.Single(r => r.Facts.File.FileName == "bad.jpg");
+        Assert.NotEqual(Reasons.ReadFailed, bad.Decision.Reason);
+        Assert.True(bad.Decision.Flags.HasFlag(DecisionFlags.SourceIgnored));
     }
 }

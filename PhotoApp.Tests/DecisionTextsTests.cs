@@ -42,6 +42,7 @@ public sealed class DecisionTextsTests
     public void FlagLabels_ListEverySetFlag()
     {
         Assert.Equal(["ambigue", "live-photo"], DecisionTexts.FlagLabels(DecisionFlags.Ambiguous | DecisionFlags.LivePhoto));
+        Assert.Equal(["source-ignoree", "live-photo-conflit"], DecisionTexts.FlagLabels(DecisionFlags.SourceIgnored | DecisionFlags.LivePhotoConflict));
         Assert.Empty(DecisionTexts.FlagLabels(DecisionFlags.None));
     }
 }

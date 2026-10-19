@@ -81,19 +81,33 @@ public sealed class MetadataReaderTests
     }
 
     [Fact]
-    public void MalformedGpsTimestamp_DoesNotThrow()
+    public void MalformedGpsTimestamp_OnlyCostsTheGpsSource()
     {
         using var temp = new TempDirectory();
         var path = temp.Combine("photo.jpg");
         TestImages.WriteJpegWithExif(path, exif =>
         {
+            exif.SetValue(ExifTag.DateTimeOriginal, "2023:03:04 13:20:15");
             exif.SetValue(ExifTag.GPSDateStamp, "2023:03:04");
             exif.SetValue(ExifTag.GPSTimestamp, [new Rational(10, 0), new Rational(0, 1), new Rational(0, 1)]);
         });
 
         var metadata = Reader.Read(path);
 
-        Assert.True(metadata.ReadError is not null || metadata.Dates.All(d => d.Origin != CandidateOrigin.Gps));
+        Assert.Null(metadata.ReadError);
+        Assert.Contains(metadata.Dates, d => d.Origin == CandidateOrigin.ExifOriginal && d.WallClock == new DateTime(2023, 3, 4, 13, 20, 15));
+        Assert.DoesNotContain(metadata.Dates, d => d.Origin == CandidateOrigin.Gps);
+        Assert.Contains(metadata.SourceWarnings, warning => warning.StartsWith("gps", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void WellFormedFile_HasNoSourceWarnings()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.Combine("photo.jpg");
+        TestImages.WriteJpeg(path, "2023:03:04 13:20:15");
+
+        Assert.Empty(Reader.Read(path).SourceWarnings);
     }
 
     [Fact]

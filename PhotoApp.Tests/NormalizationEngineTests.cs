@@ -126,4 +126,15 @@ public sealed class NormalizationEngineTests
         Assert.Equal(MediaKind.Video, result.Kind);
         Assert.Equal("VID-20260917-222944.mp4", result.ProposedName);
     }
+
+    [Fact]
+    public void IgnoredSource_IsFlagged()
+    {
+        var exif = new DateCandidate(new DateTime(2023, 3, 4, 13, 20, 15), DatePrecision.Second, CandidateOrigin.ExifOriginal);
+
+        var result = Engine().Normalize([Facts("/p/holiday.jpg", new RawMetadata { Dates = [exif], SourceWarnings = ["gps : valeur hors limites"] })]).Single();
+
+        Assert.True(result.Decision.Flags.HasFlag(DecisionFlags.SourceIgnored));
+        Assert.True(result.Decision.IsApplicable);
+    }
 }

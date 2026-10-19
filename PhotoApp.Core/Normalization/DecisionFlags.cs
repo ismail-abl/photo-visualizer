@@ -9,5 +9,7 @@ public enum DecisionFlags
     RealFormat = 4,
     AssumedZone = 8,
     Derivative = 16,
-    LivePhoto = 32
+    LivePhoto = 32,
+    LivePhotoConflict = 64,
+    SourceIgnored = 128
 }

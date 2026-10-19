@@ -57,6 +57,8 @@ public static class DecisionTexts
         Add(DecisionFlags.AssumedZone, "fuseau-suppose");
         Add(DecisionFlags.Derivative, "derive");
         Add(DecisionFlags.LivePhoto, "live-photo");
+        Add(DecisionFlags.SourceIgnored, "source-ignoree");
+        Add(DecisionFlags.LivePhotoConflict, "live-photo-conflit");
         return labels;
 
         void Add(DecisionFlags flag, string label)

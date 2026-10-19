@@ -24,4 +24,7 @@ public sealed record RawMetadata
 
     /// <summary>Message d'erreur quand le fichier est illisible : la décision sera « lecture impossible ».</summary>
     public string? ReadError { get; init; }
+
+    /// <summary>Sources ignorées parce que mal formées (« gps : message »). Les autres sources restent valables.</summary>
+    public IReadOnlyList<string> SourceWarnings { get; init; } = [];
 }

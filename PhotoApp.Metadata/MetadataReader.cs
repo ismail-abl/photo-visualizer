@@ -49,12 +49,16 @@ public sealed class MetadataReader
             : new Dictionary<string, string>();
 
         var dates = new List<DateCandidate>();
+        var warnings = new List<string>();
         var exif = directories.OfType<ExifSubIfdDirectory>().ToList();
-        AddExifDate(exif, ExifDirectoryBase.TagDateTimeOriginal, TagOffsetTimeOriginal, ExifDirectoryBase.TagSubsecondTimeOriginal, CandidateOrigin.ExifOriginal, dates);
-        AddExifDate(exif, ExifDirectoryBase.TagDateTimeDigitized, TagOffsetTimeDigitized, ExifDirectoryBase.TagSubsecondTimeDigitized, CandidateOrigin.ExifDigitized, dates);
-        AddGps(directories, dates);
-        AddXmp(directories, dates);
-        AddQuickTime(directories, apple, dates);
+        Guard("exif", warnings, () =>
+        {
+            AddExifDate(exif, ExifDirectoryBase.TagDateTimeOriginal, TagOffsetTimeOriginal, ExifDirectoryBase.TagSubsecondTimeOriginal, CandidateOrigin.ExifOriginal, dates);
+            AddExifDate(exif, ExifDirectoryBase.TagDateTimeDigitized, TagOffsetTimeDigitized, ExifDirectoryBase.TagSubsecondTimeDigitized, CandidateOrigin.ExifDigitized, dates);
+        });
+        Guard("gps", warnings, () => AddGps(directories, dates));
+        Guard("xmp", warnings, () => AddXmp(directories, dates));
+        Guard("quicktime", warnings, () => AddQuickTime(directories, apple, dates));
         foreach (var sidecar in sidecars ?? [])
         {
             if (string.Equals(Path.GetExtension(sidecar), ".xmp", StringComparison.OrdinalIgnoreCase))
@@ -72,8 +76,23 @@ public sealed class MetadataReader
             Software = Clean(ifd0?.GetString(ExifDirectoryBase.TagSoftware)) ?? Clean(apple.GetValueOrDefault(QuickTimeKeysReader.SoftwareKey)),
             ContentIdentifier = Clean(directories.OfType<AppleMakernoteDirectory>().FirstOrDefault()?.GetString(AppleMakernoteDirectory.TagContentIdentifier))
                                 ?? Clean(apple.GetValueOrDefault(QuickTimeKeysReader.ContentIdentifierKey)),
-            DetectedExtension = detected
+            DetectedExtension = detected,
+            SourceWarnings = warnings
         };
+    }
+
+    // Une source mal formée (GPS à dénominateur nul, balise du mauvais type…) est ignorée et signalée : elle ne doit jamais
+    // faire perdre les dates des autres sources du même fichier.
+    private static void Guard(string source, List<string> warnings, Action read)
+    {
+        try
+        {
+            read();
+        }
+        catch (Exception ex)
+        {
+            warnings.Add($"{source} : {ex.Message}");
+        }
     }
 
     private static void AddExifDate(

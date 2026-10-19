@@ -54,6 +54,11 @@ public sealed class NormalizationEngine
                 var decision = names[i].LivePhotoPartner is null
                     ? decisions[i]
                     : decisions[i] with { Flags = decisions[i].Flags | DecisionFlags.LivePhoto };
+                if (f.Metadata.SourceWarnings.Count > 0)
+                {
+                    decision = decision with { Flags = decision.Flags | DecisionFlags.SourceIgnored };
+                }
+
                 return new MediaResult(f, kinds[i], targets[i], readings[i], decision, names[i].ProposedName, names[i].LivePhotoPartner);
             })
             .ToList();
