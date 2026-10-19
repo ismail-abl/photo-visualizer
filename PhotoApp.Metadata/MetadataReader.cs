@@ -26,16 +26,21 @@ public sealed class MetadataReader
 
     public RawMetadata Read(string path, IReadOnlyList<string>? sidecars = null)
     {
-        IReadOnlyList<MetadataExtractor.Directory> directories;
         try
         {
-            directories = ImageMetadataReader.ReadMetadata(path);
+            return ReadCore(path, sidecars);
         }
         catch (Exception ex)
         {
-            // Format inconnu, fichier tronqué ou verrouillé : la décision sera « lecture impossible ».
+            // Bibliothèque tierce et fichiers réels parfois mal formés (dénominateur nul, mauvais type de balise…) :
+            // aucune exception ne doit sortir d'ici, sinon un seul fichier arrêterait toute l'analyse (spec de phase 1, §11).
             return new RawMetadata { ReadError = ex.Message };
         }
+    }
+
+    private static RawMetadata ReadCore(string path, IReadOnlyList<string>? sidecars)
+    {
+        var directories = ImageMetadataReader.ReadMetadata(path);
 
         var detected = Clean(directories.OfType<FileTypeDirectory>().FirstOrDefault()?.GetString(FileTypeDirectory.TagExpectedFileNameExtension))
             ?.ToLowerInvariant();
@@ -91,7 +96,10 @@ public sealed class MetadataReader
             }
 
             TimeSpan? offset = UtcOffsetParser.TryParse(directory.GetString(offsetTag), out var parsed) ? parsed : null;
-            dates.Add(new DateCandidate(wallClock, precision, origin, offset));
+            // Une date de Kind Utc vient d'un EXIF écrit avec une zone (hors norme) : ce n'est pas une heure murale flottante.
+            dates.Add(value.Kind == DateTimeKind.Utc
+                ? new DateCandidate(wallClock, precision, origin, isUtc: true)
+                : new DateCandidate(wallClock, precision, origin, offset));
             return;
         }
     }

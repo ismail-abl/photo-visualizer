@@ -69,4 +69,21 @@ public sealed class MediaAnalyzerTests
 
         Assert.Single(analysis.Results);
     }
+
+    [Fact]
+    public void Analyze_MalformedFile_DoesNotStopTheAnalysis()
+    {
+        using var temp = new TempDirectory();
+        TestImages.WriteJpeg(temp.Combine("holiday.jpg"), "2023:03:04 13:20:15");
+        TestImages.WriteJpegWithExif(temp.Combine("bad.jpg"), exif =>
+        {
+            exif.SetValue(ImageMagick.ExifTag.GPSDateStamp, "2023:03:04");
+            exif.SetValue(ImageMagick.ExifTag.GPSTimestamp, [new ImageMagick.Rational(10, 0), new ImageMagick.Rational(0, 1), new ImageMagick.Rational(0, 1)]);
+        });
+
+        var analysis = new MediaAnalyzer().Analyze([temp.FullPath], [], options: Options);
+
+        Assert.Equal(2, analysis.Results.Count);
+        Assert.Equal(Reasons.ReadFailed, analysis.Results.Single(r => r.Facts.File.FileName == "bad.jpg").Decision.Reason);
+    }
 }

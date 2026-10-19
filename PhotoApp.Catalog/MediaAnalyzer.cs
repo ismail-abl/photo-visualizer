@@ -38,9 +38,21 @@ public sealed class MediaAnalyzer
 
         var facts = new MediaFacts[media.Count];
         var done = 0;
-        Parallel.For(0, media.Count, index =>
+        var parallel = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount };
+        Parallel.For(0, media.Count, parallel, index =>
         {
-            facts[index] = new MediaFacts(media[index], _reader.Read(media[index].FullPath, media[index].Sidecars));
+            RawMetadata raw;
+            try
+            {
+                raw = _reader.Read(media[index].FullPath, media[index].Sidecars);
+            }
+            catch (Exception ex)
+            {
+                // Seconde garde : un fichier qui fait lever la lecture ne doit jamais arrêter l'analyse des autres.
+                raw = new RawMetadata { ReadError = ex.Message };
+            }
+
+            facts[index] = new MediaFacts(media[index], raw);
             progress?.Report(new AnalysisProgress(Interlocked.Increment(ref done), media.Count));
         });
 

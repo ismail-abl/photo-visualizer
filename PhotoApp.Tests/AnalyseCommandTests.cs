@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using PhotoApp.Cli;
 using PhotoApp.Core;
+using PhotoApp.Core.Normalization;
 
 namespace PhotoApp.Tests;
 
@@ -42,6 +43,27 @@ public sealed class AnalyseCommandTests
         Assert.Equal(4, File.ReadAllLines(report).Length);   // en-tête + 3 médias
         Assert.Contains("Sûre + Probable", output.ToString());
         Assert.Contains("Rapport : " + report, output.ToString());
+    }
+
+    [Fact]
+    public void Run_MalformedFile_DoesNotStopTheAnalysis()
+    {
+        using var temp = new TempDirectory();
+        var photos = CreateLibrary(temp);
+        TestImages.WriteJpegWithExif(Path.Combine(photos, "bad.jpg"), exif =>
+        {
+            exif.SetValue(ImageMagick.ExifTag.GPSDateStamp, "2023:03:04");
+            exif.SetValue(ImageMagick.ExifTag.GPSTimestamp, [new ImageMagick.Rational(10, 0), new ImageMagick.Rational(0, 1), new ImageMagick.Rational(0, 1)]);
+        });
+        var report = temp.Combine("rapport.csv");
+
+        var exitCode = new AnalyseCommand(PathsUnder(temp.Combine("data")), new StringWriter(), new StringWriter())
+            .Run(new AnalyseRequest([photos], report, []));
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var lines = File.ReadAllLines(report);
+        Assert.Equal(5, lines.Length);   // en-tête + 4 médias
+        Assert.Contains(lines, line => line.Contains("bad.jpg") && line.Contains(Reasons.ReadFailed));
     }
 
     [Fact]

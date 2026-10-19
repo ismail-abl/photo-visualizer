@@ -81,6 +81,22 @@ public sealed class MetadataReaderTests
     }
 
     [Fact]
+    public void MalformedGpsTimestamp_DoesNotThrow()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.Combine("photo.jpg");
+        TestImages.WriteJpegWithExif(path, exif =>
+        {
+            exif.SetValue(ExifTag.GPSDateStamp, "2023:03:04");
+            exif.SetValue(ExifTag.GPSTimestamp, [new Rational(10, 0), new Rational(0, 1), new Rational(0, 1)]);
+        });
+
+        var metadata = Reader.Read(path);
+
+        Assert.True(metadata.ReadError is not null || metadata.Dates.All(d => d.Origin != CandidateOrigin.Gps));
+    }
+
+    [Fact]
     public void XmpSidecar_IsRead()
     {
         using var temp = new TempDirectory();
