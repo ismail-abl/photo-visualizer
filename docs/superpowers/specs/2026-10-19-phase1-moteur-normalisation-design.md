@@ -90,6 +90,7 @@ Confiances : **Sûre** et **Probable** sont applicables ; **Incertaine** part da
 
 | Raison | Situation | Confiance de base |
 |---|---|---|
+| `deja-renomme` | Nom déjà produit par PhotoManager (`IMG-/VID-AAAAMMJJ-HHmmss[-NN]`, `-000000-NN` = jour) : le nom fait foi et n'est plus modifié | Sûre |
 | `messagerie-exif` | Profil de messagerie (WhatsApp, Signal, Telegram) avec un EXIF **antérieur ou égal** au nom, comparé à la précision du nom : la vraie prise de vue est retenue (transfert, ou heure plus précise le même jour), le nom est conservé comme information | selon l'EXIF (règles `exif-*` ci-dessous) |
 | `messagerie-nom` | Profil de messagerie : **le nom fait foi** | Sûre, précision du nom |
 | `capture-nom` | Profil de capture d'écran : le nom est l'heure de capture | Sûre |
@@ -144,6 +145,7 @@ Un profil est un enregistrement C# immuable, déclaré dans une table unique (`S
 
 | Famille | Profils |
 |---|---|
+| Application | Déjà renommé (PhotoManager) `IMG-/VID-AAAAMMJJ-HHmmss[-NN]`, `IMG-AAAAMMJJ-000000-NN` |
 | Messagerie | WhatsApp `IMG-AAAAMMJJ-WAnnnn` / `VID-…-WAnnnn` (le compteur `counter` sert à l'ordre), `WhatsApp Image AAAA-MM-JJ at HH.mm.ss` ; Signal `signal-AAAA-MM-JJ-HHmmss[_nnn]` ; Telegram `photo_AAAA-MM-JJ_HH-mm-ss` |
 | Appareil | Xiaomi `IMG_AAAAMMJJ_HHmmss` / `VID_…` ; Samsung `AAAAMMJJ_HHmmss` ; Pixel `PXL_AAAAMMJJ_HHmmssSSS` ; Huawei, OnePlus, `MVIMG_` ; Nextcloud iOS `AA-MM-JJ HH-MM-SS NNNN` (suffixe numérique ou hexadécimal) ; iPhone natif `IMG_nnnn` (sans date dans le nom, reconnu par la marque Apple) |
 | Capture | Android `Screenshot_AAAAMMJJ_HHmmss[_app]` ; Windows `Screenshot AAAA-MM-JJ HHmmss` ; Outil Capture Windows ; GNOME `Capture d’écran du AAAA-MM-JJ HH-mm-ss` et `Screenshot from …` (apostrophes `’` et `'`) ; macOS 12 h et 24 h, en anglais et en français ; KDE Spectacle ; captures de jeu (AMD, Steam…) `Titre_AAAA_MM_JJ_HH_mm_ss_fff` et `Titre JJ.MM.AAAA HH_mm_ss` (jour en premier) |
@@ -244,3 +246,4 @@ Dès que le moteur et une CLI minimale fonctionnent, la CLI analyse la biblioth�
 | Interface | Moteur unique dès la phase 1 |
 | Approche | Profils en C# déclaratif et règles explicites nommées, chaque décision portant sa raison (pas de score pondéré ni de profils en JSON) |
 | Appareil (Xiaomi…) | Un fichier édité garde l'EXIF d'origine et prend un nom à l'heure de l'édition : quand l'EXIF précède le nom d'un profil d'appareil, l'EXIF fait foi (Sûre, raison `exif-avant-nom`) — décision du 2026-10-19 |
+| Déjà renommé | Un nom produit par PhotoManager fait foi (Sûre, raison `deja-renomme`) ; il n'est plus jamais renuméroté — décision du 2026-10-19 |

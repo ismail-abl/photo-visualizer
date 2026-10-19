@@ -8,6 +8,7 @@ public static class DecisionTexts
 {
     private static readonly Dictionary<string, string> ReasonLabels = new(StringComparer.Ordinal)
     {
+        [Reasons.AlreadyNormalized] = "Nom déjà normalisé par PhotoManager (fait foi)",
         [Reasons.MessagingExif] = "EXIF de la photo d'origine (fichier reçu par messagerie)",
         [Reasons.MessagingName] = "Nom donné par la messagerie (fait foi)",
         [Reasons.ScreenshotName] = "Nom de la capture d'écran",

@@ -40,6 +40,21 @@ public sealed class NormalizationEngineTests
     }
 
     [Fact]
+    public void AlreadyRenamedFiles_KeepTheirName_AndNewcomersAreNumberedAfterThem()
+    {
+        var results = Engine().Normalize(
+        [
+            Facts("/p/IMG-20210915-000000-01.jpg"),
+            Facts("/p/IMG-20210915-000000-02.jpg"),
+            Facts("/p/IMG-20210915-WA0007.jpg")
+        ]);
+
+        Assert.Equal(
+            ["IMG-20210915-000000-01.jpg", "IMG-20210915-000000-02.jpg", "IMG-20210915-000000-03.jpg"],
+            results.OrderBy(r => r.Facts.File.FullPath, StringComparer.Ordinal).Select(r => r.ProposedName));
+    }
+
+    [Fact]
     public void LivePhoto_IsFlaggedOnBothHalves_AndTheVideoKeepsTheImgPrefix()
     {
         var photoDate = new DateCandidate(new DateTime(2024, 7, 11, 17, 7, 10), DatePrecision.Second, CandidateOrigin.ExifOriginal, TimeSpan.FromHours(2));

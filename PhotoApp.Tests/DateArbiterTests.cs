@@ -20,6 +20,25 @@ public sealed class DateArbiterTests
         Arbiter.Decide(ProfileMatcher.Read(fileName, make, folderName: null), new RawMetadata { Dates = dates, Make = make }, lastWriteUtc ?? CopiedOn);
 
     [Fact]
+    public void AlreadyRenamedDayName_IsCertain_AtDayPrecision()
+    {
+        var decision = Decide("IMG-20210915-000000-03.jpg");
+
+        Assert.Equal(Reasons.AlreadyNormalized, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+        Assert.Equal(DatePrecision.Day, decision.Date?.Precision);
+    }
+
+    [Fact]
+    public void AlreadyRenamedName_WithAnExif_IsStillTheName()
+    {
+        var decision = Decide("IMG-20250704-160803.jpg", dates: Exif(new DateTime(2025, 7, 4, 16, 8, 3)));
+
+        Assert.Equal(Reasons.AlreadyNormalized, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+    }
+
+    [Fact]
     public void ProfileName_ConfirmingExif_StillTakesTheOffsetFromGps()
     {
         var decision = Decide("IMG_20230304_132015.jpg", "Xiaomi", dates:

@@ -38,6 +38,10 @@ public sealed class SourceProfilesTests
     [InlineData("IMG_20230304_132015.jpg", null, "android", 2023, 3, 4, 13, 20, 15, DatePrecision.Second)]
     [InlineData("IMG_20230304_132015.jpg", "Canon", "android", 2023, 3, 4, 13, 20, 15, DatePrecision.Second)]
     [InlineData("VID_20230304_132015.mp4", null, "android", 2023, 3, 4, 13, 20, 15, DatePrecision.Second)]
+    [InlineData("IMG-20250704-160803.jpg", null, "deja-renomme", 2025, 7, 4, 16, 8, 3, DatePrecision.Second)]
+    [InlineData("IMG-20250704-160803-02.heic", null, "deja-renomme", 2025, 7, 4, 16, 8, 3, DatePrecision.Second)]
+    [InlineData("IMG-20210915-000000-03.jpg", null, "deja-renomme", 2021, 9, 15, 0, 0, 0, DatePrecision.Day)]
+    [InlineData("VID-20260917-222944.mp4", null, "deja-renomme", 2026, 9, 17, 22, 29, 44, DatePrecision.Second)]
     [InlineData("MVIMG_20230304_132015.jpg", null, "android", 2023, 3, 4, 13, 20, 15, DatePrecision.Second)]
     [InlineData("20260917_222944.heic", "samsung", "samsung", 2026, 9, 17, 22, 29, 44, DatePrecision.Second)]
     [InlineData("20260411_001511.jpg", null, "samsung", 2026, 4, 11, 0, 15, 11, DatePrecision.Second)]
@@ -61,6 +65,15 @@ public sealed class SourceProfilesTests
         Assert.Equal(new DateTime(year, month, day, hour, minute, second), ToSecond(reading.Date.WallClock));
         Assert.Equal(precision, reading.Date.Precision);
         Assert.Equal(CandidateOrigin.FileName, reading.Date.Origin);
+    }
+
+    [Theory]
+    [InlineData("IMG-20210915-WA0005.jpg", "whatsapp")]
+    [InlineData("IMG_20230304_132015.jpg", "android")]
+    [InlineData("20260917_222944.jpg", "samsung")]
+    public void AlreadyRenamedProfile_DoesNotCaptureOtherSources(string fileName, string profileId)
+    {
+        Assert.Equal(profileId, ProfileMatcher.Read(fileName, null, null).Profile?.Id);
     }
 
     [Theory]

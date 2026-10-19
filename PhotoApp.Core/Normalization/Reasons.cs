@@ -3,6 +3,7 @@ namespace PhotoApp.Core.Normalization;
 /// <summary>Identifiants des règles de décision (spec de phase 1, §5.4), repris tels quels dans le rapport CSV.</summary>
 public static class Reasons
 {
+    public const string AlreadyNormalized = "deja-renomme";
     public const string MessagingExif = "messagerie-exif";
     public const string MessagingName = "messagerie-nom";
     public const string ScreenshotName = "capture-nom";

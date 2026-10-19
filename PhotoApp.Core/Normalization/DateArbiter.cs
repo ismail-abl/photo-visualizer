@@ -61,6 +61,11 @@ public sealed class DateArbiter
         var exif = c.Exif;
         var profileName = c.ProfileName;
 
+        if (family == ProfileFamily.Normalized && profileName is not null)
+        {
+            return new Choice(profileName, Confidence.Certain, Reasons.AlreadyNormalized);
+        }
+
         if (family == ProfileFamily.Messaging && exif is not null && profileName is not null
             && DateComparison.CompareAt(exif, profileName, profileName.Precision) <= 0)
         {

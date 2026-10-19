@@ -6,5 +6,7 @@ public enum ProfileFamily
     Camera,
     Messaging,
     Screenshot,
-    Export
+    Export,
+    /// <summary>Nom déjà produit par PhotoManager.</summary>
+    Normalized
 }

@@ -18,6 +18,14 @@ public static class SourceProfiles
 
     public static IReadOnlyList<SourceProfile> All { get; } =
     [
+        // Noms déjà produits par PhotoManager : la date du nom fait foi.
+        new("deja-renomme", "Déjà renommé (PhotoManager)", ProfileFamily.Normalized,
+        [
+            // Jour seul : « 000000 » ne sert qu'au tri, le suffixe -NN est toujours présent.
+            P(@"^(?:IMG|VID)-" + Ymd + @"-000000-(?<counter>\d{2})$"),
+            P(@"^(?:IMG|VID)-" + Ymd + "-" + Hms + @"(?:-(?<counter>\d{2}))?$")
+        ]),
+
         // Messageries : le nom fait foi.
         new("whatsapp", "WhatsApp", ProfileFamily.Messaging,
         [
