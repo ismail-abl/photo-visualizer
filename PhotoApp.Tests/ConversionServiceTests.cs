@@ -7,9 +7,9 @@ public sealed class ConversionServiceTests
     private static IReadOnlyList<ImageFileInfo> ScanAndResolve(string root, string outputFolder)
     {
         var resolver = new ImageDateResolver();
-        return new ImageScanner()
-            .Scan(root, new ScanOptions([outputFolder]))
-            .Select(i => new ImageFileInfo(i.FullPath, i.FileName, i.Extension, i.FileSizeBytes, resolver.Resolve(i.FullPath)))
+        return new MediaScanner()
+            .Scan(root, new ScanOptions([outputFolder])).Media
+            .Select(m => new ImageFileInfo(m.FullPath, m.FileName, m.Extension, m.SizeBytes, resolver.Resolve(m.FullPath)))
             .ToList();
     }
 

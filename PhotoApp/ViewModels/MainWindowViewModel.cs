@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using PhotoApp.Catalog;
 using PhotoApp.Core;
 using PhotoApp.Core.Models;
+using PhotoApp.Core.Services;
 using PhotoApp.Metadata;
 using PhotoApp.Operations;
 
@@ -19,7 +20,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private const string OutputFolderName = "Converted";
     private const int JpegQuality = 90;
 
-    private readonly ImageScanner _imageScanner = new();
+    private readonly MediaScanner _mediaScanner = new();
     private readonly ImageDateResolver _imageDateResolver = new();
     private readonly ConversionService _conversionService = new();
     private readonly AppDataPaths _dataPaths = AppDataPaths.ForCurrentUser();
@@ -95,18 +96,22 @@ public partial class MainWindowViewModel : ViewModelBase
     private List<ImageFileInfo> ScanAndResolve(string root)
     {
         var outputFolder = Path.Combine(root, OutputFolderName);
-        var scanned = _imageScanner.Scan(root, new ScanOptions([outputFolder]));
+
+        // L'interface ne traite que les photos en phase 1 ; les vidéos arrivent en phase 2.
+        var scanned = _mediaScanner.Scan(root, new ScanOptions([outputFolder])).Media
+            .Where(media => SupportedMediaExtensions.IsPhoto(media.Extension))
+            .ToList();
         var resolved = new ImageFileInfo[scanned.Count];
 
         Parallel.For(0, scanned.Count, index =>
         {
-            var image = scanned[index];
+            var media = scanned[index];
             resolved[index] = new ImageFileInfo(
-                image.FullPath,
-                image.FileName,
-                image.Extension,
-                image.FileSizeBytes,
-                _imageDateResolver.Resolve(image.FullPath));
+                media.FullPath,
+                media.FileName,
+                media.Extension,
+                media.SizeBytes,
+                _imageDateResolver.Resolve(media.FullPath));
         });
 
         return resolved.OrderBy(image => image.FileName, StringComparer.OrdinalIgnoreCase).ToList();
