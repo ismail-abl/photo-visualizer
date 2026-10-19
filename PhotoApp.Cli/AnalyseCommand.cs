@@ -52,7 +52,7 @@ public sealed class AnalyseCommand
                 return ExitCodes.InvalidArguments;
             }
 
-            if (folders.Any(folder => IsInside(requestedReport, folder)))
+            if (folders.Any(folder => IsInsideAnalysedFolder(requestedReport, folder)))
             {
                 _error.WriteLine($"Le rapport ne doit pas être écrit dans un dossier analysé : {requestedReport}");
                 return ExitCodes.InvalidArguments;
@@ -82,10 +82,13 @@ public sealed class AnalyseCommand
     }
 
     // Le séparateur final évite de confondre D:\Photos2 avec D:\Photos ; la casse compte sous Linux seulement.
-    private static bool IsInside(string path, string folder)
+    public static bool IsInsideAnalysedFolder(string path, string folder)
     {
         var comparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-        var root = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
-        return path.StartsWith(root, comparison) || string.Equals(Path.TrimEndingDirectorySeparator(path), Path.TrimEndingDirectorySeparator(folder), comparison);
+        path = Path.GetFullPath(path);
+        folder = Path.GetFullPath(folder);
+        // Une racine (D:\, /) porte déjà son séparateur final.
+        var prefix = folder.EndsWith(Path.DirectorySeparatorChar) ? folder : folder + Path.DirectorySeparatorChar;
+        return path.StartsWith(prefix, comparison) || string.Equals(Path.TrimEndingDirectorySeparator(path), Path.TrimEndingDirectorySeparator(folder), comparison);
     }
 }

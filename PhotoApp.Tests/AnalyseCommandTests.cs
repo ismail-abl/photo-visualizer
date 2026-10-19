@@ -127,6 +127,43 @@ public sealed class AnalyseCommandTests
     }
 
     [Fact]
+    public void IsInsideAnalysedFolder_HandlesRootsAndSiblings()
+    {
+        var root = Path.GetPathRoot(Path.GetFullPath(Path.GetTempPath()))!;
+        var folder = Path.Combine(root, "photos");
+
+        Assert.True(AnalyseCommand.IsInsideAnalysedFolder(Path.Combine(root, "x.csv"), root));
+        Assert.True(AnalyseCommand.IsInsideAnalysedFolder(Path.Combine(folder, "sub", "x.csv"), folder));
+        Assert.True(AnalyseCommand.IsInsideAnalysedFolder(folder, folder));
+        Assert.False(AnalyseCommand.IsInsideAnalysedFolder(Path.Combine(root, "photos2", "x.csv"), folder));
+    }
+
+    [Fact]
+    public void Run_ReportInSiblingFolder_UppercaseCsv_AndExistingReport_AreAllowed()
+    {
+        using var temp = new TempDirectory();
+        var photos = CreateLibrary(temp);
+        var sibling = temp.Combine("photos2");
+        Directory.CreateDirectory(sibling);
+
+        var siblingReport = Path.Combine(sibling, "r.csv");
+        Assert.Equal(ExitCodes.Success, new AnalyseCommand(PathsUnder(temp.Combine("data")), new StringWriter(), new StringWriter())
+            .Run(new AnalyseRequest([photos], siblingReport, [])));
+        Assert.True(File.Exists(siblingReport));
+
+        var upper = temp.Combine("R.CSV");
+        Assert.Equal(ExitCodes.Success, new AnalyseCommand(PathsUnder(temp.Combine("data")), new StringWriter(), new StringWriter())
+            .Run(new AnalyseRequest([photos], upper, [])));
+        Assert.True(File.Exists(upper));
+
+        var old = temp.Combine("old.csv");
+        File.WriteAllText(old, "ancien");
+        Assert.Equal(ExitCodes.Success, new AnalyseCommand(PathsUnder(temp.Combine("data")), new StringWriter(), new StringWriter())
+            .Run(new AnalyseRequest([photos], old, [])));
+        Assert.DoesNotContain("ancien", File.ReadAllText(old));
+    }
+
+    [Fact]
     public void Run_ReportWithoutCsvExtension_IsRefused()
     {
         using var temp = new TempDirectory();
