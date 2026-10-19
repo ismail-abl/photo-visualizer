@@ -17,7 +17,10 @@ public sealed class RenameWorkflowTests
         return photos;
     }
 
-    private static IReadOnlyList<MediaResult> Analyze(string photos) => new MediaAnalyzer().Analyze([photos], []).Results;
+    // Horloge et fuseau figés : ni l'heure du PC ni son fuseau n'entrent dans le résultat.
+    private static readonly NormalizationOptions Options = new(new DateTime(2026, 10, 19, 12, 0, 0), TestZones.PlusOne);
+
+    private static IReadOnlyList<MediaResult> Analyze(string photos) => new MediaAnalyzer().Analyze([photos], [], options: Options).Results;
 
     [Fact]
     public void ApplyThenUndo_GivesBackAnIdenticalState()
@@ -30,13 +33,29 @@ public sealed class RenameWorkflowTests
 
         var summary = workflow.Apply(workflow.Prepare(Analyze(photos), [photos]));
 
+        // État intermédiaire : exactement quatre fichiers renommés (photo, son sidecar, WhatsApp, vidéo), le fichier sans date intact.
         Assert.Equal(0, summary.Counts.Failed);
-        Assert.True(File.Exists(Path.Combine(photos, "IMG-20230304-132015.jpg")));
-        Assert.True(File.Exists(Path.Combine(photos, "IMG-20230304-132015.xmp")));
-        Assert.True(File.Exists(Path.Combine(photos, "IMG-20210915-000000-01.png")));
-        Assert.True(File.Exists(Path.Combine(photos, "blank.jpg")));
-        Assert.False(File.Exists(Path.Combine(photos, "holiday.jpg")));
-        Assert.Equal(new DateTime(2023, 3, 4, 12, 20, 15, DateTimeKind.Utc), File.GetLastWriteTimeUtc(Path.Combine(photos, "IMG-20230304-132015.jpg")));
+        Assert.Equal(4, summary.Counts.Done);
+        Assert.Equal(0, summary.Counts.Skipped);
+        string[] renamed = ["IMG-20210915-000000-01.png", "IMG-20230304-132015.jpg", "IMG-20230304-132015.xmp", "VID-20260917-222944.mp4"];
+        Assert.Equal([.. renamed, "blank.jpg"], new DirectoryInfo(photos).EnumerateFiles().Select(file => file.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(before["blank.jpg"], Snapshot(photos)["blank.jpg"]);
+
+        // Chaque fichier renommé porte, en création comme en modification, l'instant enregistré au journal (lui-même issu du plan).
+        var items = journal.GetItems(summary.BatchId);
+        Assert.Equal(renamed, items.Select(item => Path.GetFileName(item.TargetPath)).Order(StringComparer.Ordinal));
+        Assert.All(items, item =>
+        {
+            Assert.Equal(ItemState.Done, item.State);
+            Assert.False(File.Exists(item.SourcePath));
+            Assert.Equal(item.DecidedDate.UtcDateTime, File.GetCreationTimeUtc(item.TargetPath));
+            Assert.Equal(item.DecidedDate.UtcDateTime, File.GetLastWriteTimeUtc(item.TargetPath));
+        });
+
+        var photo = Path.Combine(photos, "IMG-20230304-132015.jpg");
+        var decidedPhoto = new DateTime(2023, 3, 4, 12, 20, 15, DateTimeKind.Utc);
+        Assert.Equal(decidedPhoto, File.GetCreationTimeUtc(photo));
+        Assert.Equal(decidedPhoto, File.GetLastWriteTimeUtc(photo));
 
         var undo = new BatchUndo(journal).Undo(summary.BatchId);
 
@@ -56,7 +75,7 @@ public sealed class RenameWorkflowTests
         var second = workflow.Prepare(Analyze(photos), [photos]);
 
         Assert.Empty(second.Plan.Items);
-        Assert.True(second.Plan.Summary.AlreadyConforming >= 2);
+        Assert.Equal(3, second.Plan.Summary.AlreadyConforming);
     }
 
     [Fact]
@@ -95,9 +114,12 @@ public sealed class RenameWorkflowTests
     {
         using var temp = new TempDirectory();
         var photos = Photos(temp);
-        var workflow = new RenameWorkflow(NewJournal(temp), TestZones.PlusOne);
+        var journal = NewJournal(temp);
+        var workflow = new RenameWorkflow(journal, TestZones.PlusOne);
 
         Assert.Throws<InvalidOperationException>(() => workflow.Apply(workflow.Prepare(Analyze(photos), [photos])));
+
+        Assert.Empty(journal.ListBatches());
     }
 
     [Fact]
@@ -115,6 +137,38 @@ public sealed class RenameWorkflowTests
         Assert.Throws<InvalidOperationException>(() => workflow.Apply(prepared));
 
         Assert.Equal(before, Snapshot(photos));
-        Assert.Single(journal.ListBatches());
+        Assert.Equal(stuck, Assert.Single(journal.ListBatches()).Id);
+        journal.AcquireExecutionLock().Dispose();   // le verrou a bien été relâché malgré le refus
+    }
+
+    [Fact]
+    public void Apply_WhileTheExecutionLockIsHeld_Throws_AndCreatesNoBatch()
+    {
+        using var temp = new TempDirectory();
+        var photos = Library(temp);
+        var before = Snapshot(photos);
+        var journal = NewJournal(temp);
+        var workflow = new RenameWorkflow(journal, TestZones.PlusOne);
+        var prepared = workflow.Prepare(Analyze(photos), [photos]);
+
+        using var held = journal.AcquireExecutionLock();
+
+        Assert.Throws<BatchLockedException>(() => workflow.Apply(prepared));
+
+        Assert.Empty(journal.ListBatches());
+        Assert.Equal(before, Snapshot(photos));
+    }
+
+    [Fact]
+    public void Apply_ReleasesTheExecutionLock()
+    {
+        using var temp = new TempDirectory();
+        var photos = Library(temp);
+        var journal = NewJournal(temp);
+        var workflow = new RenameWorkflow(journal, TestZones.PlusOne);
+
+        workflow.Apply(workflow.Prepare(Analyze(photos), [photos]));
+
+        journal.AcquireExecutionLock().Dispose();
     }
 }

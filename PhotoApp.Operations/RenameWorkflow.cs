@@ -31,6 +31,9 @@ public sealed class RenameWorkflow(IBatchJournal journal, TimeZoneInfo? zone = n
             throw new InvalidOperationException("Le plan est vide : rien à renommer.");
         }
 
+        // Le verrou est pris avant le contrôle et la création du lot : un traitement concurrent est refusé sans rien écrire au journal.
+        using var executionLock = journal.AcquireExecutionLock();
+
         if (journal.FindUnfinished() is { } unfinished)
         {
             throw new InvalidOperationException(
@@ -38,6 +41,6 @@ public sealed class RenameWorkflow(IBatchJournal journal, TimeZoneInfo? zone = n
         }
 
         var batchId = journal.CreateBatch(DateTime.UtcNow, prepared.Folders, prepared.Plan.Items);
-        return new InPlaceRenamer(journal).Run(batchId, cancellation, progress);
+        return new InPlaceRenamer(journal).RunWithLockHeld(batchId, cancellation, progress);
     }
 }
