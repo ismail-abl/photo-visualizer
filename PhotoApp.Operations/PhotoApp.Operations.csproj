@@ -8,6 +8,10 @@
     <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.17.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="PhotoApp.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
