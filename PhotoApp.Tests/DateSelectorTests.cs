@@ -7,8 +7,8 @@ public sealed class DateSelectorTests
 {
     private static readonly DateTime Now = new(2026, 10, 18, 12, 0, 0);
 
-    private static ImageDateCandidate At(int year, int month, int day, bool hasTime = true) =>
-        new(new DateTime(year, month, day, 10, 0, 0), hasTime);
+    private static DateCandidate At(int year, int month, int day, bool hasTime = true) =>
+        new(new DateTime(year, month, day, 10, 0, 0), hasTime ? DatePrecision.Second : DatePrecision.Day);
 
     [Fact]
     public void Select_PrefersNative_ThenFileName_ThenFileSystem()
@@ -26,7 +26,7 @@ public sealed class DateSelectorTests
     [Fact]
     public void Select_SkipsImplausibleCandidates()
     {
-        var resetClock = new ImageDateCandidate(new DateTime(2000, 1, 1, 0, 0, 0), true);
+        var resetClock = new DateCandidate(new DateTime(2000, 1, 1, 0, 0, 0), DatePrecision.Second);
         var name = At(2025, 2, 3);
 
         var (candidate, source) = DateSelector.Select(resetClock, name, null, Now);

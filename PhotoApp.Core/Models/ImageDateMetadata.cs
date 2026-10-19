@@ -6,10 +6,10 @@ namespace PhotoApp.Core.Models;
 public sealed class ImageDateMetadata
 {
     public ImageDateMetadata(
-        ImageDateCandidate? native,
-        ImageDateCandidate? fileName,
-        ImageDateCandidate? fileSystem,
-        ImageDateCandidate? retained,
+        DateCandidate? native,
+        DateCandidate? fileName,
+        DateCandidate? fileSystem,
+        DateCandidate? retained,
         ImageDateSource retainedSource,
         string? normalizedFileNamePreview)
     {
@@ -21,13 +21,13 @@ public sealed class ImageDateMetadata
         NormalizedFileNamePreview = normalizedFileNamePreview;
     }
 
-    public ImageDateCandidate? NativeCandidate { get; }
+    public DateCandidate? NativeCandidate { get; }
 
-    public ImageDateCandidate? FileNameCandidate { get; }
+    public DateCandidate? FileNameCandidate { get; }
 
-    public ImageDateCandidate? FileSystemCandidate { get; }
+    public DateCandidate? FileSystemCandidate { get; }
 
-    public ImageDateCandidate? RetainedCandidate { get; }
+    public DateCandidate? RetainedCandidate { get; }
 
     public ImageDateSource RetainedSource { get; }
 

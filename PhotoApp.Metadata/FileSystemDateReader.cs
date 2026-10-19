@@ -4,7 +4,7 @@ namespace PhotoApp.Metadata;
 
 public class FileSystemDateReader
 {
-    public virtual ImageDateCandidate? Read(string filePath)
+    public virtual DateCandidate? Read(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
@@ -15,7 +15,7 @@ public class FileSystemDateReader
         {
             var fileInfo = new FileInfo(filePath);
             var wallClock = fileInfo.LastWriteTime;
-            return new ImageDateCandidate(wallClock, true, TimeZoneInfo.Local.GetUtcOffset(wallClock));
+            return new DateCandidate(wallClock, DatePrecision.Second, CandidateOrigin.FileModified, TimeZoneInfo.Local.GetUtcOffset(wallClock));
         }
         catch (UnauthorizedAccessException)
         {

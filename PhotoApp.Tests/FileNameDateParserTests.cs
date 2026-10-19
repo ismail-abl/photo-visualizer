@@ -55,13 +55,13 @@ public sealed class FileNameDateParserTests
     [Theory]
     [InlineData("mmexport1700000000000.jpg", 2023, 11, 14, 22, 13, 20)]
     [InlineData("FB_IMG_1700000000.jpg", 2023, 11, 14, 22, 13, 20)]
-    public void Parse_EpochNames_AreUtcWithZeroOffset(string fileName, int year, int month, int day, int hour, int minute, int second)
+    public void Parse_EpochNames_AreUtc(string fileName, int year, int month, int day, int hour, int minute, int second)
     {
         var result = new FileNameDateParser().Parse(fileName);
 
         Assert.NotNull(result);
         Assert.Equal(new DateTime(year, month, day, hour, minute, second), result.WallClock);
-        Assert.Equal(TimeSpan.Zero, result.Offset);
+        Assert.True(result.IsUtc);
         Assert.True(result.HasTime);
     }
 

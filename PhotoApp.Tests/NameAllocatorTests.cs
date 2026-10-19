@@ -5,9 +5,9 @@ namespace PhotoApp.Tests;
 
 public sealed class NameAllocatorTests
 {
-    private static ImageDateCandidate Shot() => new(new DateTime(2024, 1, 5, 15, 4, 12), true);
+    private static DateCandidate Shot() => new(new DateTime(2024, 1, 5, 15, 4, 12), DatePrecision.Second);
 
-    private static ImageDateCandidate DayOnly() => new(new DateTime(2024, 1, 5), false);
+    private static DateCandidate DayOnly() => new(new DateTime(2024, 1, 5), DatePrecision.Day);
 
     [Fact]
     public void Allocate_FirstFileOfASecond_HasNoSuffix()

@@ -8,9 +8,9 @@ public sealed class ImageDateResolverTests
     [Fact]
     public void Resolve_PrefersNativeMetadata_OverFilenameAndFilesystem()
     {
-        var nativeReader = new StubNativeImageMetadataReader(new ImageDateCandidate(new DateTime(2024, 1, 2, 3, 4, 5), true));
-        var fileNameParser = new StubFileNameDateParser(new ImageDateCandidate(new DateTime(2025, 2, 3, 4, 5, 6), true));
-        var fileSystemReader = new StubFileSystemDateReader(new ImageDateCandidate(new DateTime(2026, 3, 4, 5, 6, 7), true));
+        var nativeReader = new StubNativeImageMetadataReader(new DateCandidate(new DateTime(2024, 1, 2, 3, 4, 5), DatePrecision.Second));
+        var fileNameParser = new StubFileNameDateParser(new DateCandidate(new DateTime(2025, 2, 3, 4, 5, 6), DatePrecision.Second));
+        var fileSystemReader = new StubFileSystemDateReader(new DateCandidate(new DateTime(2026, 3, 4, 5, 6, 7), DatePrecision.Second));
         var resolver = new ImageDateResolver(nativeReader, fileNameParser, fileSystemReader);
 
         var result = resolver.Resolve("photo.jpg");
@@ -28,8 +28,8 @@ public sealed class ImageDateResolverTests
     public void Resolve_FallsBackToFilename_WhenNativeMetadataIsMissing()
     {
         var nativeReader = new StubNativeImageMetadataReader(null);
-        var fileNameParser = new StubFileNameDateParser(new ImageDateCandidate(new DateTime(2021, 10, 29, 0, 0, 0), false));
-        var fileSystemReader = new StubFileSystemDateReader(new ImageDateCandidate(new DateTime(2026, 3, 4, 5, 6, 7), true));
+        var fileNameParser = new StubFileNameDateParser(new DateCandidate(new DateTime(2021, 10, 29, 0, 0, 0), DatePrecision.Day));
+        var fileSystemReader = new StubFileSystemDateReader(new DateCandidate(new DateTime(2026, 3, 4, 5, 6, 7), DatePrecision.Second));
         var resolver = new ImageDateResolver(nativeReader, fileNameParser, fileSystemReader);
 
         var result = resolver.Resolve("IMG-20211029-WA0039.jpg");
@@ -46,7 +46,7 @@ public sealed class ImageDateResolverTests
     {
         var nativeReader = new StubNativeImageMetadataReader(null);
         var fileNameParser = new StubFileNameDateParser(null);
-        var fileSystemReader = new StubFileSystemDateReader(new ImageDateCandidate(new DateTime(2026, 5, 4, 18, 19, 20), true));
+        var fileSystemReader = new StubFileSystemDateReader(new DateCandidate(new DateTime(2026, 5, 4, 18, 19, 20), DatePrecision.Second));
         var resolver = new ImageDateResolver(nativeReader, fileNameParser, fileSystemReader);
 
         var result = resolver.Resolve("photo.jpg");
@@ -62,14 +62,14 @@ public sealed class ImageDateResolverTests
 
     private sealed class StubNativeImageMetadataReader : NativeImageMetadataReader
     {
-        private readonly ImageDateCandidate? _result;
+        private readonly DateCandidate? _result;
 
-        public StubNativeImageMetadataReader(ImageDateCandidate? result)
+        public StubNativeImageMetadataReader(DateCandidate? result)
         {
             _result = result;
         }
 
-        public override ImageDateCandidate? Read(string filePath)
+        public override DateCandidate? Read(string filePath)
         {
             return _result;
         }
@@ -77,14 +77,14 @@ public sealed class ImageDateResolverTests
 
     private sealed class StubFileNameDateParser : FileNameDateParser
     {
-        private readonly ImageDateCandidate? _result;
+        private readonly DateCandidate? _result;
 
-        public StubFileNameDateParser(ImageDateCandidate? result)
+        public StubFileNameDateParser(DateCandidate? result)
         {
             _result = result;
         }
 
-        public override ImageDateCandidate? Parse(string fileName)
+        public override DateCandidate? Parse(string fileName)
         {
             return _result;
         }
@@ -92,14 +92,14 @@ public sealed class ImageDateResolverTests
 
     private sealed class StubFileSystemDateReader : FileSystemDateReader
     {
-        private readonly ImageDateCandidate? _result;
+        private readonly DateCandidate? _result;
 
-        public StubFileSystemDateReader(ImageDateCandidate? result)
+        public StubFileSystemDateReader(DateCandidate? result)
         {
             _result = result;
         }
 
-        public override ImageDateCandidate? Read(string filePath)
+        public override DateCandidate? Read(string filePath)
         {
             return _result;
         }

@@ -15,7 +15,7 @@ public class NativeImageMetadataReader
     // Dates de prise de vue uniquement : xmp:ModifyDate et xmp:MetadataDate sont des dates d'édition.
     private static readonly string[] XmpDateKeys = ["exif:DateTimeOriginal", "photoshop:DateCreated", "xmp:CreateDate"];
 
-    public virtual ImageDateCandidate? Read(string filePath)
+    public virtual DateCandidate? Read(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -35,18 +35,18 @@ public class NativeImageMetadataReader
         return ReadExifDate(directories) ?? ReadXmpDate(directories);
     }
 
-    private static ImageDateCandidate? ReadExifDate(IEnumerable<MetadataExtractor.Directory> directories)
+    private static DateCandidate? ReadExifDate(IEnumerable<MetadataExtractor.Directory> directories)
     {
         foreach (var exifDirectory in directories.OfType<ExifSubIfdDirectory>())
         {
             if (exifDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out var original))
             {
-                return new ImageDateCandidate(original, true, ReadOffset(exifDirectory, TagOffsetTimeOriginal));
+                return new DateCandidate(original, DatePrecision.Second, CandidateOrigin.ExifOriginal, ReadOffset(exifDirectory, TagOffsetTimeOriginal));
             }
 
             if (exifDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeDigitized, out var digitized))
             {
-                return new ImageDateCandidate(digitized, true, ReadOffset(exifDirectory, TagOffsetTimeDigitized));
+                return new DateCandidate(digitized, DatePrecision.Second, CandidateOrigin.ExifDigitized, ReadOffset(exifDirectory, TagOffsetTimeDigitized));
             }
         }
 
@@ -56,7 +56,7 @@ public class NativeImageMetadataReader
     private static TimeSpan? ReadOffset(ExifSubIfdDirectory directory, int tag) =>
         UtcOffsetParser.TryParse(directory.GetString(tag), out var offset) ? offset : null;
 
-    private static ImageDateCandidate? ReadXmpDate(IEnumerable<MetadataExtractor.Directory> directories)
+    private static DateCandidate? ReadXmpDate(IEnumerable<MetadataExtractor.Directory> directories)
     {
         foreach (var xmpDirectory in directories.OfType<XmpDirectory>())
         {

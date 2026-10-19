@@ -8,7 +8,7 @@ public sealed class RenamePlannerTests
     private static readonly IReadOnlyDictionary<string, PreviousOutput> NoPrevious = new Dictionary<string, PreviousOutput>();
 
     private static PlanInput Input(string path, DateTime wallClock, bool hasTime = true, long size = 10, long ticks = 1) =>
-        new(path, new ImageDateCandidate(wallClock, hasTime), size, ticks);
+        new(path, new DateCandidate(wallClock, hasTime ? DatePrecision.Second : DatePrecision.Day), size, ticks);
 
     [Fact]
     public void PlanRenames_SameSecond_IsOrderedByFileName_NotByInputOrder()

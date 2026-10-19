@@ -12,7 +12,7 @@ public static class DatePlausibility
         new(1970, 1, 1, 0, 0, 0)
     ];
 
-    public static bool IsPlausible(ImageDateCandidate candidate, DateTime utcNow)
+    public static bool IsPlausible(DateCandidate candidate, DateTime utcNow)
     {
         var date = candidate.WallClock;
         if (date < WindowStart || date > utcNow.AddDays(1))

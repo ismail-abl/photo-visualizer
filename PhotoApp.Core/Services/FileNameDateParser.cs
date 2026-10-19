@@ -37,7 +37,7 @@ public class FileNameDateParser
 
     private static readonly Regex DateOnlyPattern = new("(?<!\\d)(?<date>\\d{8})(?!\\d)", Options);
 
-    public virtual ImageDateCandidate? Parse(string fileName)
+    public virtual DateCandidate? Parse(string fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName))
         {
@@ -57,7 +57,7 @@ public class FileNameDateParser
             var match = pattern.Match(fileName);
             if (match.Success && TryBuildFromGroups(match, out var wallClock, out var hasTime))
             {
-                return Plausible(new ImageDateCandidate(wallClock, hasTime), now);
+                return Plausible(new DateCandidate(wallClock, hasTime ? DatePrecision.Second : DatePrecision.Day, CandidateOrigin.FileName), now);
             }
         }
 
@@ -71,16 +71,16 @@ public class FileNameDateParser
         if (dateOnlyMatch.Success &&
             DateTime.TryParseExact(dateOnlyMatch.Groups["date"].Value, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateOnly))
         {
-            return Plausible(new ImageDateCandidate(dateOnly, false), now);
+            return Plausible(new DateCandidate(dateOnly, DatePrecision.Day, CandidateOrigin.FileName), now);
         }
 
         return null;
     }
 
-    private static ImageDateCandidate? Plausible(ImageDateCandidate candidate, DateTime now) =>
+    private static DateCandidate? Plausible(DateCandidate candidate, DateTime now) =>
         DatePlausibility.IsPlausible(candidate, now) ? candidate : null;
 
-    private static ImageDateCandidate? TryParseEpoch(string fileName)
+    private static DateCandidate? TryParseEpoch(string fileName)
     {
         var match = EpochPattern.Match(fileName);
         if (!match.Success)
@@ -99,7 +99,7 @@ public class FileNameDateParser
             var instant = text.Length == 13
                 ? DateTimeOffset.FromUnixTimeMilliseconds(value)
                 : DateTimeOffset.FromUnixTimeSeconds(value);
-            return new ImageDateCandidate(instant.UtcDateTime, true, TimeSpan.Zero);
+            return new DateCandidate(instant.UtcDateTime, DatePrecision.Second, CandidateOrigin.FileName, isUtc: true);
         }
         catch (ArgumentOutOfRangeException)
         {
@@ -107,7 +107,7 @@ public class FileNameDateParser
         }
     }
 
-    private static ImageDateCandidate? TryParseDayMonthYear(Match match, DateTime now)
+    private static DateCandidate? TryParseDayMonthYear(Match match, DateTime now)
     {
         var first = Number(match, "first");
         var second = Number(match, "second");
@@ -133,7 +133,7 @@ public class FileNameDateParser
         }
 
         return TryBuild(Number(match, "year"), month, day, Number(match, "hour"), Number(match, "minute"), Number(match, "secondPart"), out var wallClock)
-            ? Plausible(new ImageDateCandidate(wallClock, true), now)
+            ? Plausible(new DateCandidate(wallClock, DatePrecision.Second, CandidateOrigin.FileName), now)
             : null;
     }
 

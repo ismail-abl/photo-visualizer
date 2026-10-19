@@ -28,7 +28,7 @@ public sealed class NormalizedFileNameBuilderTests
         string expected)
     {
         _ = sourceFileName; // documente l'origine du cas
-        var date = new ImageDateCandidate(new DateTime(year, month, day, hour, minute, second), hasTime);
+        var date = new DateCandidate(new DateTime(year, month, day, hour, minute, second), hasTime ? DatePrecision.Second : DatePrecision.Day);
 
         var result = NormalizedFileNameBuilder.Preview(date);
 

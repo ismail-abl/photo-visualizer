@@ -4,10 +4,10 @@ namespace PhotoApp.Core.Services;
 
 public static class DateSelector
 {
-    public static (ImageDateCandidate? Candidate, ImageDateSource Source) Select(
-        ImageDateCandidate? native,
-        ImageDateCandidate? fileName,
-        ImageDateCandidate? fileSystem,
+    public static (DateCandidate? Candidate, ImageDateSource Source) Select(
+        DateCandidate? native,
+        DateCandidate? fileName,
+        DateCandidate? fileSystem,
         DateTime utcNow)
     {
         if (IsUsable(native, utcNow))
@@ -32,6 +32,6 @@ public static class DateSelector
     public static bool IsReliable(ImageDateSource source) =>
         source is ImageDateSource.NativeMetadata or ImageDateSource.FileName;
 
-    private static bool IsUsable(ImageDateCandidate? candidate, DateTime utcNow) =>
+    private static bool IsUsable(DateCandidate? candidate, DateTime utcNow) =>
         candidate is not null && DatePlausibility.IsPlausible(candidate, utcNow);
 }

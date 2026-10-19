@@ -15,7 +15,7 @@ public sealed class DatePlausibilityTests
     [InlineData(2026, 10, 20, false)]  // après-demain : refusé
     public void IsPlausible_AppliesTheWindow(int year, int month, int day, bool expected)
     {
-        var candidate = new ImageDateCandidate(new DateTime(year, month, day, 10, 0, 0), true);
+        var candidate = new DateCandidate(new DateTime(year, month, day, 10, 0, 0), DatePrecision.Second);
 
         Assert.Equal(expected, DatePlausibility.IsPlausible(candidate, Now));
     }
@@ -25,7 +25,7 @@ public sealed class DatePlausibilityTests
     [InlineData(1970, 1, 1)]
     public void IsPlausible_RejectsResetClocks(int year, int month, int day)
     {
-        var candidate = new ImageDateCandidate(new DateTime(year, month, day, 0, 0, 0), true);
+        var candidate = new DateCandidate(new DateTime(year, month, day, 0, 0, 0), DatePrecision.Second);
 
         Assert.False(DatePlausibility.IsPlausible(candidate, Now));
     }

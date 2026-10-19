@@ -6,7 +6,7 @@ namespace PhotoApp.Tests;
 
 public sealed class BatchRenameExecutorTests
 {
-    private static readonly ImageDateCandidate Noon = new(new DateTime(2023, 1, 1, 12, 0, 0), true, TimeSpan.Zero);
+    private static readonly DateCandidate Noon = new(new DateTime(2023, 1, 1, 12, 0, 0), DatePrecision.Second, offset: TimeSpan.Zero);
 
     [Fact]
     public void DryRun_ReturnsResultsWithoutExecuting()

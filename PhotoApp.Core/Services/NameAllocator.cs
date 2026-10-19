@@ -23,7 +23,7 @@ public sealed class NameAllocator
         }
     }
 
-    public string Allocate(ImageDateCandidate date, string extension)
+    public string Allocate(DateCandidate date, string extension)
     {
         var baseName = NormalizedFileNameBuilder.BaseName(date);
         var normalizedExtension = NormalizedFileNameBuilder.NormalizeExtension(extension);
