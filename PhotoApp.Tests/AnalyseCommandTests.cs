@@ -109,15 +109,53 @@ public sealed class AnalyseCommandTests
     }
 
     [Fact]
+    public void Run_ReportInsideAnalysedFolder_IsRefused()
+    {
+        using var temp = new TempDirectory();
+        var photos = CreateLibrary(temp);
+        var before = Snapshot(photos);
+        var report = Path.Combine(photos, "rapport.csv");
+        var error = new StringWriter();
+
+        var exitCode = new AnalyseCommand(PathsUnder(temp.Combine("data")), new StringWriter(), error)
+            .Run(new AnalyseRequest([photos], report, []));
+
+        Assert.Equal(ExitCodes.InvalidArguments, exitCode);
+        Assert.Contains("Le rapport ne doit pas être écrit dans un dossier analysé", error.ToString());
+        Assert.False(File.Exists(report));
+        Assert.Equal(before, Snapshot(photos));
+    }
+
+    [Fact]
+    public void Run_ReportWithoutCsvExtension_IsRefused()
+    {
+        using var temp = new TempDirectory();
+        var photos = CreateLibrary(temp);
+        var existing = temp.Combine("photo.jpg");
+        var bytes = new byte[] { 1, 2, 3, 4 };
+        File.WriteAllBytes(existing, bytes);
+        var error = new StringWriter();
+
+        var exitCode = new AnalyseCommand(PathsUnder(temp.Combine("data")), new StringWriter(), error)
+            .Run(new AnalyseRequest([photos], existing, []));
+
+        Assert.Equal(ExitCodes.InvalidArguments, exitCode);
+        Assert.Contains("Le rapport doit être un fichier .csv", error.ToString());
+        Assert.Equal(bytes, File.ReadAllBytes(existing));
+    }
+
+    [Fact]
     public void Run_UnwritableReport_IsFatal()
     {
         using var temp = new TempDirectory();
         var photos = CreateLibrary(temp);
         var error = new StringWriter();
 
-        // Un dossier existant à la place du fichier de rapport.
+        // Un dossier existant, hors des photos, à la place du fichier de rapport.
+        var report = temp.Combine("rapport.csv");
+        Directory.CreateDirectory(report);
         var exitCode = new AnalyseCommand(PathsUnder(temp.Combine("data")), new StringWriter(), error)
-            .Run(new AnalyseRequest([photos], photos, []));
+            .Run(new AnalyseRequest([photos], report, []));
 
         Assert.Equal(ExitCodes.Fatal, exitCode);
         Assert.Contains("Impossible d'écrire le rapport", error.ToString());

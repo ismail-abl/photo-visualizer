@@ -43,13 +43,28 @@ public sealed class AnalyseCommand
             return ExitCodes.InvalidArguments;
         }
 
+        var requestedReport = request.OutputPath is { Length: > 0 } output ? Path.GetFullPath(output) : null;
+        if (requestedReport is not null)
+        {
+            if (!requestedReport.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                _error.WriteLine($"Le rapport doit être un fichier .csv : {requestedReport}");
+                return ExitCodes.InvalidArguments;
+            }
+
+            if (folders.Any(folder => IsInside(requestedReport, folder)))
+            {
+                _error.WriteLine($"Le rapport ne doit pas être écrit dans un dossier analysé : {requestedReport}");
+                return ExitCodes.InvalidArguments;
+            }
+        }
+
         var excluded = request.Excluded.Select(folder => Path.GetFullPath(folder)).ToList();
         var analysis = new MediaAnalyzer().Analyze(folders, excluded, new ConsoleProgress(_error));
         _error.WriteLine();
 
-        var reportPath = request.OutputPath is { Length: > 0 } output
-            ? Path.GetFullPath(output)
-            : Path.Combine(_paths.ReportsFolder, "analyse-" + _localNow().ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".csv");
+        var reportPath = requestedReport
+            ?? Path.Combine(_paths.ReportsFolder, "analyse-" + _localNow().ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".csv");
 
         try
         {
@@ -64,5 +79,13 @@ public sealed class AnalyseCommand
         AnalysisSummary.From(analysis).Print(_output);
         _output.WriteLine($"Rapport : {reportPath}");
         return ExitCodes.Success;
+    }
+
+    // Le séparateur final évite de confondre D:\Photos2 avec D:\Photos ; la casse compte sous Linux seulement.
+    private static bool IsInside(string path, string folder)
+    {
+        var comparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        var root = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
+        return path.StartsWith(root, comparison) || string.Equals(Path.TrimEndingDirectorySeparator(path), Path.TrimEndingDirectorySeparator(folder), comparison);
     }
 }

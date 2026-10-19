@@ -189,6 +189,7 @@ photoapp analyse <dossier>... [--out <fichier.csv>] [--exclude <dossier>]...
   - fichiers exclus (cachés, vides), dossiers inaccessibles, erreurs ;
   - durée.
 - La progression s'affiche pendant l'analyse.
+- **Garde sur `--out`** : le rapport doit être un fichier `.csv` hors des dossiers analysés ; sinon code 1, avant toute analyse.
 - **Code de sortie** : 0 si l'analyse a abouti, même avec des fichiers illisibles ; 1 pour un argument invalide ; 2 pour une erreur fatale, par exemple un rapport impossible à écrire.
 
 ## 10. Interface

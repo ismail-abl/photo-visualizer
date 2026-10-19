@@ -80,6 +80,7 @@ dotnet run --project PhotoApp.Cli -c Release -- analyse "D:\Photos" "D:\Vidéos"
 ```
 
 - Rien n'est écrit à côté des photos. Le rapport va dans `%LOCALAPPDATA%\PhotoManager\reports\analyse-AAAAMMJJ-HHmmss.csv` (ou `--out fichier.csv`).
+- `--out` doit désigner un fichier `.csv` hors des dossiers analysés (sinon code 1).
 - Le CSV s'ouvre directement dans Excel ou LibreOffice (UTF-8 avec BOM, séparateur `;`).
 - Codes de sortie : 0 analyse faite (même avec des fichiers illisibles, listés dans le rapport), 1 argument invalide, 2 erreur fatale.
 
