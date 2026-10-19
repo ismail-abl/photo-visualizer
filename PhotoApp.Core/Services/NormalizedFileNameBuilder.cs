@@ -6,9 +6,9 @@ namespace PhotoApp.Core.Services;
 public static class NormalizedFileNameBuilder
 {
     /// <summary>Nom sans suffixe ni extension. Jour seul : l'heure 000000 sert uniquement au tri (spec §5.5).</summary>
-    public static string BaseName(DateCandidate date) => date.HasTime
-        ? "IMG-" + date.WallClock.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)
-        : "IMG-" + date.WallClock.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + "-000000";
+    public static string BaseName(DateCandidate date, string prefix = "IMG") => date.HasTime
+        ? prefix + "-" + date.WallClock.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)
+        : prefix + "-" + date.WallClock.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + "-000000";
 
     public static string NormalizeExtension(string extension)
     {

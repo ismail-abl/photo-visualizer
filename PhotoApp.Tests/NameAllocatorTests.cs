@@ -50,4 +50,29 @@ public sealed class NameAllocatorTests
     {
         Assert.Equal(expected, NormalizedFileNameBuilder.NormalizeExtension(input));
     }
+
+    [Fact]
+    public void Allocate_VideoPrefix()
+    {
+        Assert.Equal("VID-20240105-150412.mp4", new NameAllocator().Allocate(Shot(), ".mp4", "VID"));
+    }
+
+    [Fact]
+    public void Allocate_SameSecondWithAnotherExtension_StillGetsASuffix()
+    {
+        var allocator = new NameAllocator();
+
+        Assert.Equal("IMG-20240105-150412.jpg", allocator.Allocate(Shot(), ".jpg"));
+        Assert.Equal("IMG-20240105-150412-01.heic", allocator.Allocate(Shot(), ".heic"));
+    }
+
+    [Fact]
+    public void TryReserve_TakesTheBaseName_Once()
+    {
+        var allocator = new NameAllocator();
+
+        Assert.True(allocator.TryReserve("IMG-20240105-150412.heic"));
+        Assert.False(allocator.TryReserve("img-20240105-150412.jpg"));
+        Assert.Equal("IMG-20240105-150412-01.jpg", allocator.Allocate(Shot(), ".jpg"));
+    }
 }
