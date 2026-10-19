@@ -29,7 +29,7 @@ public sealed class SourceProfilesTests
     [InlineData("Screenshot from 2023-02-03 04-05-06.png", null, "capture-gnome", 2023, 2, 3, 4, 5, 6, DatePrecision.Second)]
     [InlineData("Screenshot 2024-01-05 at 3.04.12 PM.png", null, "capture-macos", 2024, 1, 5, 15, 4, 12, DatePrecision.Second)]
     [InlineData("Screenshot 2024-01-05 at 12.04.12 AM.png", null, "capture-macos", 2024, 1, 5, 0, 4, 12, DatePrecision.Second)]
-    [InlineData("Screenshot 2024-01-05 at 3.04.12 PM.png", null, "capture-macos", 2024, 1, 5, 15, 4, 12, DatePrecision.Second)]
+    [InlineData("Screenshot 2024-01-05 at 3.04.12\u202FPM.png", null, "capture-macos", 2024, 1, 5, 15, 4, 12, DatePrecision.Second)]
     [InlineData("Capture d’écran 2024-01-05 à 15.04.12.png", null, "capture-macos", 2024, 1, 5, 15, 4, 12, DatePrecision.Second)]
     // Appareils
     [InlineData("IMG_20230304_132015.jpg", "Xiaomi", "xiaomi", 2023, 3, 4, 13, 20, 15, DatePrecision.Second)]
