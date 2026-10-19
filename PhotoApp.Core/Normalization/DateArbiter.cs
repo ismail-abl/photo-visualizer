@@ -42,7 +42,7 @@ public sealed class DateArbiter
         var rejected = all.Where(c => !DatePlausibility.IsPlausible(c, _options.UtcNow)).ToList();
         var candidates = new Candidates(plausible, name);
 
-        var choice = SelectPrimary(candidates);
+        var choice = Confront(SelectPrimary(candidates), candidates);
 
         var date = choice.Date;
         if (date is { IsUtc: true })
@@ -132,6 +132,53 @@ public sealed class DateArbiter
         return new Choice(null, Confidence.None, Reasons.Nothing);
     }
 
+    // Étape 2 : le candidat principal face à chaque autre candidat fort. Un désaccord inexpliqué fait tomber la confiance.
+    private static Choice Confront(Choice choice, Candidates c)
+    {
+        if (choice.Date is null)
+        {
+            return choice;
+        }
+
+        foreach (var other in c.Strong)
+        {
+            if (other.Origin == choice.Date.Origin || Agrees(choice.Date, other, c.Reading))
+            {
+                continue;
+            }
+
+            return choice with
+            {
+                Confidence = Confidence.Uncertain,
+                Reason = Reasons.Disagreement,
+                Flags = choice.Flags | DecisionFlags.Disagreement
+            };
+        }
+
+        return choice;
+    }
+
+    private static bool Agrees(DateCandidate primary, DateCandidate other, NameReading reading)
+    {
+        if (DateComparison.Concordant(primary, other))
+        {
+            return true;
+        }
+
+        // Une heure locale et une valeur UTC séparées par un fuseau valide.
+        if ((!primary.IsUtc && other.IsUtc && DateComparison.ZoneGap(primary, other) is not null)
+            || (primary.IsUtc && !other.IsUtc && DateComparison.ZoneGap(other, primary) is not null))
+        {
+            return true;
+        }
+
+        // Transfert : l'EXIF d'un fichier reçu ou téléchargé est plus ancien que son nom.
+        return other.Origin == CandidateOrigin.FileName
+               && reading.Profile?.Family is ProfileFamily.Messaging or ProfileFamily.Export
+               && primary.Origin is CandidateOrigin.ExifOriginal or CandidateOrigin.ExifDigitized
+               && DateComparison.CompareAt(primary, other, other.Precision) <= 0;
+    }
+
     // EXIF sans décalage : Sûr s'il concorde avec le nom d'un profil ou si le GPS en déduit le décalage, Probable sinon.
     private static Choice FromExif(DateCandidate exif, Candidates c, string? reason)
     {
@@ -181,6 +228,15 @@ public sealed class DateArbiter
         public DateCandidate? ProfileName => Reading.FromProfilePattern ? Name : null;
 
         public DateCandidate? FileModified => Get(CandidateOrigin.FileModified);
+
+        /// <summary>Candidats forts : métadonnées internes, et le nom s'il est lu par un profil. Ni GPS ni date du fichier.</summary>
+        public IEnumerable<DateCandidate> Strong => Plausible.Where(candidate => candidate.Origin switch
+        {
+            CandidateOrigin.ExifOriginal or CandidateOrigin.ExifDigitized or CandidateOrigin.QuickTimeApple
+                or CandidateOrigin.QuickTimeMovieHeader or CandidateOrigin.Xmp or CandidateOrigin.XmpSidecar => true,
+            CandidateOrigin.FileName => Reading.FromProfilePattern,
+            _ => false
+        });
 
         public DateCandidate? Get(CandidateOrigin origin) => Plausible.FirstOrDefault(c => c.Origin == origin);
     }
