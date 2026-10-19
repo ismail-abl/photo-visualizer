@@ -218,10 +218,12 @@ public sealed class AnalyseCommandTests
         Assert.Contains("Impossible d'écrire le rapport", error.ToString());
     }
 
+    // Phase 2 : la CLI référence Operations (commande « renomme », via RenameWorkflow) ; l'analyse elle-même
+    // (Catalog, Metadata, Core) reste en lecture seule et ne peut pas atteindre Operations.
     [Fact]
-    public void ReadOnlyByConstruction_NoProjectOfTheCliReferencesOperations()
+    public void ReadOnlyByConstruction_NoProjectOfTheAnalysisReferencesOperations()
     {
-        var assemblies = new[] { typeof(AnalyseCommand).Assembly, typeof(MediaAnalyzer).Assembly, typeof(MetadataReader).Assembly };
+        var assemblies = new[] { typeof(MediaAnalyzer).Assembly, typeof(MetadataReader).Assembly };
 
         Assert.All(assemblies, assembly =>
             Assert.DoesNotContain("PhotoApp.Operations", assembly.GetReferencedAssemblies().Select(name => name.Name)));
@@ -237,7 +239,7 @@ public sealed class AnalyseCommandTests
         }
 
         Assert.NotNull(root);
-        foreach (var project in new[] { "PhotoApp.Cli", "PhotoApp.Catalog", "PhotoApp.Metadata", "PhotoApp.Core" })
+        foreach (var project in new[] { "PhotoApp.Catalog", "PhotoApp.Metadata", "PhotoApp.Core" })
         {
             var references = System.Xml.Linq.XDocument.Load(Path.Combine(root.FullName, project, project + ".csproj"))
                 .Descendants("ProjectReference")

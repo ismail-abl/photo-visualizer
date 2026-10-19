@@ -72,6 +72,6 @@ public static class CsvReportWriter
                 .Where(candidate => origins.Contains(candidate.Origin))
                 .Select(candidate => DecisionTexts.FormatCandidate(candidate) + " (écartée)")));
 
-    private static string Escape(string value) =>
+    internal static string Escape(string value) =>
         value.IndexOfAny([';', '"', '\n', '\r']) >= 0 ? "\"" + value.Replace("\"", "\"\"") + "\"" : value;
 }

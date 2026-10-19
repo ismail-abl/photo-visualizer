@@ -9,11 +9,12 @@
     <RootNamespace>PhotoApp.Cli</RootNamespace>
   </PropertyGroup>
 
-  <!-- Jamais PhotoApp.Operations : la CLI est en lecture seule (spec de phase 1, §9). -->
+  <!-- Operations seulement pour le renommage sur place (RenameWorkflow, BatchUndo, InPlaceRenamer) ; la commande analyse reste en lecture seule. -->
   <ItemGroup>
     <ProjectReference Include="..\PhotoApp.Core\PhotoApp.Core.csproj" />
     <ProjectReference Include="..\PhotoApp.Metadata\PhotoApp.Metadata.csproj" />
     <ProjectReference Include="..\PhotoApp.Catalog\PhotoApp.Catalog.csproj" />
+    <ProjectReference Include="..\PhotoApp.Operations\PhotoApp.Operations.csproj" />
   </ItemGroup>
 
   <ItemGroup>

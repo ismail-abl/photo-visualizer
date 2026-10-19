@@ -12,6 +12,7 @@ public static class ExitCodes
     public const int Success = 0;
     public const int InvalidArguments = 1;
     public const int Fatal = 2;
+    public const int BatchIssues = 3;   // lot terminé avec des échecs, ou interrompu
 }
 
 /// <summary>
