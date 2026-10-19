@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="PhotoApp.Catalog/PhotoApp.Catalog.csproj" />
+  <Project Path="PhotoApp.Cli/PhotoApp.Cli.csproj" />
   <Project Path="PhotoApp.Core/PhotoApp.Core.csproj" />
   <Project Path="PhotoApp.Metadata/PhotoApp.Metadata.csproj" />
   <Project Path="PhotoApp.Operations/PhotoApp.Operations.csproj" />
