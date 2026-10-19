@@ -10,8 +10,25 @@ public sealed record BatchRunSummary(long BatchId, BatchCounts Counts, bool Canc
 /// Exécute un lot : renommage sur place, un seul déplacement par fichier, journal écrit avant chaque action
 /// (spec de phase 2, §5.3). Un échec sur un fichier n'arrête pas le lot ; l'arrêt demandé termine le fichier en cours.
 /// </summary>
-public sealed class InPlaceRenamer(IBatchJournal journal)
+public sealed class InPlaceRenamer
 {
+    private readonly IBatchJournal journal;
+    private readonly Action<string, string> moveFile;
+    private readonly Action<string, DateTime, DateTime> setTimes;
+
+    public InPlaceRenamer(IBatchJournal journal)
+        : this(journal, FileMoves.Move, FileTimestamps.Set)
+    {
+    }
+
+    // Déplacement et réglage des dates injectables : seul moyen de provoquer, dans les tests, les échecs tardifs d'un système de fichiers.
+    internal InPlaceRenamer(IBatchJournal journal, Action<string, string> moveFile, Action<string, DateTime, DateTime> setTimes)
+    {
+        this.journal = journal;
+        this.moveFile = moveFile;
+        this.setTimes = setTimes;
+    }
+
     public BatchRunSummary Run(long batchId, CancellationToken cancellation = default, IProgress<BatchProgress>? progress = null)
     {
         using var executionLock = journal.AcquireExecutionLock();
@@ -23,7 +40,7 @@ public sealed class InPlaceRenamer(IBatchJournal journal)
         }
 
         journal.SetBatchState(batchId, BatchState.Running);
-        new BatchRecovery(journal).Resolve(batchId);
+        new BatchRecovery(journal, setTimes).Resolve(batchId);
         SkipFailingEntries(batchId);
 
         var items = journal.GetItems(batchId);
@@ -61,35 +78,87 @@ public sealed class InPlaceRenamer(IBatchJournal journal)
     private void Execute(BatchItem item)
     {
         journal.SetItemState(item.Id, ItemState.Running);   // validé avant le déplacement
-        var moved = false;
         try
         {
-            FileMoves.Move(item.SourcePath, item.TargetPath);
-            moved = true;
+            moveFile(item.SourcePath, item.TargetPath);
+        }
+        catch (Exception ex) when (IsFileSystemFailure(ex))
+        {
+            journal.SetItemState(item.Id, ItemState.Failed, ex.Message);
+            return;
+        }
+
+        // Le fichier est désormais sous son nouveau nom.
+        try
+        {
             var instant = item.DecidedDate.UtcDateTime;
-            FileTimestamps.Set(item.TargetPath, instant, instant);
+            setTimes(item.TargetPath, instant, instant);
             var info = new FileInfo(item.TargetPath);
             journal.SetItemDone(item.Id, info.Length, info.LastWriteTimeUtc);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (IsFileSystemFailure(ex))
         {
-            var message = moved ? ex.Message + RollBack(item) : ex.Message;
-            journal.SetItemState(item.Id, ItemState.Failed, message);
+            HandleDatesFailure(item, ex);
         }
     }
 
-    // Retour arrière au mieux quand les dates n'ont pas pu être appliquées : le fichier retrouve son nom et ses dates d'origine.
-    private static string RollBack(BatchItem item)
+    // Les dates n'ont pas pu être appliquées après le déplacement : retour arrière au mieux. L'emplacement du fichier ne se déduit
+    // que du résultat du déplacement de retour, jamais de celui de la restauration des dates.
+    private void HandleDatesFailure(BatchItem item, Exception datesFailure)
     {
         try
         {
-            FileMoves.Move(item.TargetPath, item.SourcePath);
-            FileTimestamps.Set(item.SourcePath, item.SourceCreationUtc, item.SourceLastWriteUtc);
-            return " (renommage annulé)";
+            moveFile(item.TargetPath, item.SourcePath);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception moveBackFailure) when (IsFileSystemFailure(moveBackFailure))
         {
-            return $" (retour arrière impossible, le fichier est sous {item.TargetPath} : {ex.Message})";
+            KeepRenamed(item, datesFailure, moveBackFailure);
+            return;
+        }
+
+        // Le fichier a retrouvé son ancien nom ; ses dates d'origine ne sont restaurées que si elles ont bougé.
+        try
+        {
+            var current = FileTimestamps.Read(item.SourcePath);
+            if (current.CreationUtc != item.SourceCreationUtc || current.LastWriteUtc != item.SourceLastWriteUtc)
+            {
+                setTimes(item.SourcePath, item.SourceCreationUtc, item.SourceLastWriteUtc);
+            }
+        }
+        catch (Exception restoreFailure) when (IsFileSystemFailure(restoreFailure))
+        {
+            journal.SetItemState(
+                item.Id,
+                ItemState.Failed,
+                $"{datesFailure.Message} (renommage annulé, dates d'origine non restaurées : {restoreFailure.Message})");
+            return;
+        }
+
+        journal.SetItemState(item.Id, ItemState.Failed, datesFailure.Message + " (renommage annulé)");
+    }
+
+    // Retour arrière impossible : le fichier reste sous son nouveau nom, il est bien renommé, seules ses dates n'ont pas été appliquées.
+    // L'élément est donc « fait » (avec un avertissement), pour que l'annulation du lot, qui ne traite que les éléments faits, puisse le restaurer.
+    private void KeepRenamed(BatchItem item, Exception datesFailure, Exception moveBackFailure)
+    {
+        try
+        {
+            var info = new FileInfo(item.TargetPath);
+            journal.SetItemDone(
+                item.Id,
+                info.Length,
+                info.LastWriteTimeUtc,
+                $"dates non appliquées : {datesFailure.Message} ; retour arrière impossible : {moveBackFailure.Message}");
+        }
+        catch (Exception ex) when (IsFileSystemFailure(ex))
+        {
+            // Le fichier n'est pas non plus sous le nouveau nom (retour arrière interrompu en route) : le message du déplacement dit où il est.
+            journal.SetItemState(
+                item.Id,
+                ItemState.Failed,
+                $"{datesFailure.Message} (retour arrière impossible : {moveBackFailure.Message} ; fichier illisible sous {item.TargetPath} : {ex.Message})");
         }
     }
+
+    private static bool IsFileSystemFailure(Exception ex) => ex is IOException or UnauthorizedAccessException;
 }
