@@ -352,6 +352,31 @@ public sealed class DateArbiterTests
     }
 
     [Fact]
+    public void Screenshot_WithAZuluXmpLaterInRealTime_IsNotPromotedToTheCaptureTime()
+    {
+        // Le nom (heure locale UTC+1) vaut 21:45:00Z ; un XMP en 21:50:00Z est postérieur de 5 min en temps réel,
+        // même si son heure brute (21:50) précède l'heure murale du nom (22:45).
+        var decision = Decide("Screenshot 2025-05-19 224500.png", dates: Utc(new DateTime(2025, 5, 19, 21, 50, 0), CandidateOrigin.Xmp));
+
+        Assert.NotEqual(Reasons.ExifBeforeName, decision.Reason);
+        Assert.Equal(Reasons.Disagreement, decision.Reason);
+        Assert.Equal(Confidence.Uncertain, decision.Confidence);
+        Assert.Equal(new DateTime(2025, 5, 19, 22, 45, 0), decision.Date?.WallClock);
+    }
+
+    [Fact]
+    public void Screenshot_WithAZuluXmpEarlierInRealTime_StaysInDisagreement()
+    {
+        // 21:40:00Z = 22:40 locale, 5 min avant le nom (22:45). L'écart brut au nom (1 h 05) n'est pas un fuseau valide :
+        // une valeur UTC n'est jamais comparée à l'heure locale du nom, donc pas de promotion, et le désaccord est signalé.
+        var decision = Decide("Screenshot 2025-05-19 224500.png", dates: Utc(new DateTime(2025, 5, 19, 21, 40, 0), CandidateOrigin.Xmp));
+
+        Assert.Equal(Reasons.Disagreement, decision.Reason);
+        Assert.Equal(Confidence.Uncertain, decision.Confidence);
+        Assert.Equal(new DateTime(2025, 5, 19, 22, 45, 0), decision.Date?.WallClock);
+    }
+
+    [Fact]
     public void Screenshot_WithoutMetadata_KeepsTheNameAsTheCaptureTime()
     {
         var decision = Decide("Screenshot 2025-05-19 224500.png");

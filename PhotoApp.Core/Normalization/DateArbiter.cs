@@ -80,11 +80,12 @@ public sealed class DateArbiter
         if (family == ProfileFamily.Screenshot && profileName is not null)
         {
             // Le nom d'une capture est l'heure d'enregistrement : une métadonnée antérieure est l'heure réelle de la capture
-            // (même principe qu'un appareil dont le fichier édité garde l'EXIF d'origine).
+            // (même principe qu'un appareil dont le fichier édité garde l'EXIF d'origine). Seule une heure murale se compare
+            // à celle du nom : une valeur UTC (XMP en « Z ») relève de la confrontation (écart de fuseau).
             if (profileName.IsUtc is false)
             {
                 var earlier = new[] { exif, c.Xmp }.FirstOrDefault(
-                    meta => meta is not null && DateComparison.CompareAt(meta, profileName, profileName.Precision) < 0);
+                    meta => meta is { IsUtc: false } && DateComparison.CompareAt(meta, profileName, profileName.Precision) < 0);
                 if (earlier is not null)
                 {
                     return new Choice(earlier, Confidence.Certain, Reasons.ExifBeforeName);
