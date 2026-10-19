@@ -117,6 +117,6 @@ public sealed class QuickTimeKeysReaderTests
 
         var keys = QuickTimeKeysReader.Read(path);
 
-        Assert.All(keys.Keys, key => Assert.Contains(key, AppleKeys.Keys));
+        Assert.Empty(keys);
     }
 }

@@ -3,7 +3,7 @@
 Application desktop locale, hors ligne, pour normaliser les dates et les noms de photos personnelles, les parcourir et les convertir en JPEG sans perdre leurs métadonnées. Développée en priorité pour Windows, portable sur Linux et macOS.
 
 - **Vision et feuille de route :** [`docs/superpowers/specs/2026-10-14-vision-feuille-de-route-design.md`](docs/superpowers/specs/2026-10-14-vision-feuille-de-route-design.md)
-- **Phase en cours :** phase 1 (moteur de normalisation, lecture seule) terminée — spec : [`docs/superpowers/specs/2026-10-19-phase1-moteur-normalisation-design.md`](docs/superpowers/specs/2026-10-19-phase1-moteur-normalisation-design.md), plan : [`docs/superpowers/plans/2026-10-19-phase1-moteur-normalisation.md`](docs/superpowers/plans/2026-10-19-phase1-moteur-normalisation.md). Prochaine étape : phase 2, exécution sûre (renommage sur place, journal, annulation).
+- **Phase en cours :** phase 1 (moteur de normalisation, lecture seule) implémentée sur la branche `feat/phase1-normalisation`, en attente de validation : objectif chiffré à fixer (mesure réelle : 94,1 % Sûre + Probable), vérification visuelle de l'interface et CI Linux/macOS à faire — spec : [`docs/superpowers/specs/2026-10-19-phase1-moteur-normalisation-design.md`](docs/superpowers/specs/2026-10-19-phase1-moteur-normalisation-design.md), plan : [`docs/superpowers/plans/2026-10-19-phase1-moteur-normalisation.md`](docs/superpowers/plans/2026-10-19-phase1-moteur-normalisation.md). Prochaine étape : phase 2, exécution sûre (renommage sur place, journal, annulation).
 
 ## Ce qui marche aujourd'hui
 

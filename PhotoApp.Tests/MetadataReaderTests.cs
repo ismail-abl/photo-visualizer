@@ -97,6 +97,19 @@ public sealed class MetadataReaderTests
     }
 
     [Fact]
+    public void ExifWrittenWithAZone_IsTreatedAsUtc()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.Combine("photo.jpg");
+        TestImages.WriteJpeg(path, "2024:01:05 15:04:12+09:00");
+
+        var date = Reader.Read(path).Dates.Single(d => d.Origin == CandidateOrigin.ExifOriginal);
+
+        Assert.True(date.IsUtc);
+        Assert.Equal(new DateTime(2024, 1, 5, 6, 4, 12), date.WallClock);
+    }
+
+    [Fact]
     public void XmpSidecar_IsRead()
     {
         using var temp = new TempDirectory();

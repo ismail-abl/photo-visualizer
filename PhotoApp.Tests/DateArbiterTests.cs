@@ -20,6 +20,20 @@ public sealed class DateArbiterTests
         Arbiter.Decide(ProfileMatcher.Read(fileName, make, folderName: null), new RawMetadata { Dates = dates, Make = make }, lastWriteUtc ?? CopiedOn);
 
     [Fact]
+    public void ProfileName_ConfirmingExif_StillTakesTheOffsetFromGps()
+    {
+        var decision = Decide("IMG_20230304_132015.jpg", "Xiaomi", dates:
+        [
+            Exif(new DateTime(2023, 3, 4, 13, 20, 15)),
+            Utc(new DateTime(2023, 3, 4, 12, 20, 14), CandidateOrigin.Gps)
+        ]);
+
+        Assert.Equal(Reasons.ExifConcordant, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+        Assert.Equal(TimeSpan.FromHours(1), decision.Date?.Offset);
+    }
+
+    [Fact]
     public void WhatsApp_NameIsTheTruth_EvenWhenTheFileWasCopiedLater()
     {
         var decision = Decide("IMG-20210915-WA0005.jpg");

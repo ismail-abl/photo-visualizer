@@ -142,7 +142,7 @@ public sealed class DateArbiter
 
         foreach (var other in c.Strong)
         {
-            if (other.Origin == choice.Date.Origin || Agrees(choice.Date, other, c.Reading))
+            if (other.Origin == choice.Date.Origin || Agrees(choice.Date, other))
             {
                 continue;
             }
@@ -158,7 +158,7 @@ public sealed class DateArbiter
         return choice;
     }
 
-    private static bool Agrees(DateCandidate primary, DateCandidate other, NameReading reading)
+    private static bool Agrees(DateCandidate primary, DateCandidate other)
     {
         if (DateComparison.Concordant(primary, other))
         {
@@ -206,6 +206,12 @@ public sealed class DateArbiter
         {
             if (!name.IsUtc && DateComparison.ExifMatchesName(exif, name))
             {
+                // Le nom confirme l'heure ; le GPS, s'il existe, fournit en plus le décalage (spec §5.4).
+                if (c.Gps is not null && DateComparison.OffsetFromGps(exif, c.Gps) is { } confirmedOffset)
+                {
+                    return new Choice(exif with { Offset = confirmedOffset }, Confidence.Certain, reason ?? Reasons.ExifConcordant);
+                }
+
                 return new Choice(exif, Confidence.Certain, reason ?? Reasons.ExifConcordant);
             }
 

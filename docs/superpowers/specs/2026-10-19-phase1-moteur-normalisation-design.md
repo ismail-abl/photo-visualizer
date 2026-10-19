@@ -110,7 +110,7 @@ Confiances : **Sûre** et **Probable** sont applicables ; **Incertaine** part da
 **Étape 2 — confrontation.** Le candidat principal est comparé à chaque autre candidat **fort** :
 
 - s'il y a concordance, ou un écart de fuseau valide entre une valeur locale et une valeur UTC : rien ne change ;
-- si le désaccord est **expliqué** par un enregistrement postérieur (EXIF antérieur ou égal au nom, quel que soit le profil : transfert par messagerie, téléchargement, copie retouchée ou exportée) : rien ne change, et l'autre valeur reste une information ;
+- si le désaccord est **expliqué** par un enregistrement postérieur (le candidat principal est l'EXIF, antérieur ou égal au nom, quel que soit le profil ; un nom principal face à un EXIF plus ancien reste un désaccord : transfert par messagerie, téléchargement, copie retouchée ou exportée) : rien ne change, et l'autre valeur reste une information ;
 - sinon : la confiance tombe à **Incertaine**, la raison devient `desaccord`, et le drapeau `desaccord` est posé avec les deux valeurs.
 
 La date du fichier ne participe jamais à la confrontation. Pour un profil de messagerie, elle ne peut donc jamais contredire le nom : par exemple, `IMG-20210915-WA0005.jpg` modifié le 2023-03-01 reste daté du 2021-09-15, Sûre.

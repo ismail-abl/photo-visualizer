@@ -131,4 +131,23 @@ public sealed class AnalyseCommandTests
         Assert.All(assemblies, assembly =>
             Assert.DoesNotContain("PhotoApp.Operations", assembly.GetReferencedAssemblies().Select(name => name.Name)));
     }
+
+    [Fact]
+    public void ReadOnlyByConstruction_NoProjectFileReferencesOperations()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "PhotoVisualizer.slnx")))
+        {
+            root = root.Parent;
+        }
+
+        Assert.NotNull(root);
+        foreach (var project in new[] { "PhotoApp.Cli", "PhotoApp.Catalog", "PhotoApp.Metadata", "PhotoApp.Core" })
+        {
+            var references = System.Xml.Linq.XDocument.Load(Path.Combine(root.FullName, project, project + ".csproj"))
+                .Descendants("ProjectReference")
+                .Select(reference => (string?)reference.Attribute("Include") ?? "");
+            Assert.DoesNotContain(references, include => include.Contains("PhotoApp.Operations"));
+        }
+    }
 }

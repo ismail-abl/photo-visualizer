@@ -54,7 +54,7 @@ public static class XmpDateParser
         }
 
         var zone = hasTime && match.Groups["zone"].Success ? match.Groups["zone"].Value : null;
-        if (zone is "Z" or "z")
+        if (zone is "Z")
         {
             return new DateCandidate(wallClock, precision, origin, isUtc: true);
         }
