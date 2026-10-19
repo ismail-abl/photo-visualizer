@@ -9,6 +9,7 @@ public static class Reasons
     public const string ExifWithOffset = "exif-decalage";
     public const string QuickTimeApple = "quicktime-apple";
     public const string ExifConcordant = "exif-concordant";
+    public const string ExifBeforeName = "exif-avant-nom";
     public const string ExifOnly = "exif-seul";
     public const string VideoUtcName = "video-utc-nom";
     public const string ProfileName = "nom-profil";

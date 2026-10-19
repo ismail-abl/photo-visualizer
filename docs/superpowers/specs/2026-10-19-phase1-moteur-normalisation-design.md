@@ -96,6 +96,7 @@ Confiances : **Sûre** et **Probable** sont applicables ; **Incertaine** part da
 | `exif-decalage` | EXIF `DateTimeOriginal` (sinon `DateTimeDigitized`) avec décalage | Sûre |
 | `quicktime-apple` | `com.apple.quicktime.creationdate` (décalage inclus) | Sûre |
 | `exif-concordant` | EXIF sans décalage, concordant avec le nom d'un profil ou avec un décalage déduit du GPS | Sûre, avec le décalage déduit s'il existe |
+| `exif-avant-nom` | EXIF sans décalage **antérieur** au nom d'un profil d'appareil : fichier édité ou enregistré après la prise de vue, l'EXIF d'origine fait foi (décision de l'utilisateur) | Sûre |
 | `exif-seul` | EXIF sans décalage, sans autre confirmation | Probable |
 | `video-utc-nom` | `mvhd` (UTC) et nom d'un profil séparés par un écart de fuseau valide | Sûre, heure du nom, décalage déduit |
 | `nom-profil` | Nom lu par un profil d'appareil, sans métadonnées internes | Probable |
@@ -242,3 +243,4 @@ Dès que le moteur et une CLI minimale fonctionnent, la CLI analyse la biblioth�
 | Objectif chiffré | Mesurer d'abord, fixer à mi-phase |
 | Interface | Moteur unique dès la phase 1 |
 | Approche | Profils en C# déclaratif et règles explicites nommées, chaque décision portant sa raison (pas de score pondéré ni de profils en JSON) |
+| Appareil (Xiaomi…) | Un fichier édité garde l'EXIF d'origine et prend un nom à l'heure de l'édition : quand l'EXIF précède le nom d'un profil d'appareil, l'EXIF fait foi (Sûre, raison `exif-avant-nom`) — décision du 2026-10-19 |

@@ -52,8 +52,8 @@ public sealed class DateArbiterConfrontationTests
     {
         var decision = Decide("IMG_20250704_160803.jpg", "Xiaomi", dates: Exif(new DateTime(2025, 6, 20, 21, 48, 56)));
 
-        Assert.Equal(Reasons.ExifOnly, decision.Reason);
-        Assert.Equal(Confidence.Probable, decision.Confidence);
+        Assert.Equal(Reasons.ExifBeforeName, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
     }
 
     [Fact]

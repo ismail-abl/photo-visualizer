@@ -34,6 +34,34 @@ public sealed class DateArbiterTests
     }
 
     [Fact]
+    public void DeviceName_LaterThanTheExif_ExifIsTheTruth()
+    {
+        var decision = Decide("IMG_20250805_170441.jpg", dates: Exif(new DateTime(2025, 8, 5, 13, 15, 16)));
+
+        Assert.Equal(Reasons.ExifBeforeName, decision.Reason);
+        Assert.Equal(Confidence.Certain, decision.Confidence);
+        Assert.Equal(new DateTime(2025, 8, 5, 13, 15, 16), decision.Date?.WallClock);
+    }
+
+    [Fact]
+    public void GenericName_LaterThanTheExif_StaysExifOnly()
+    {
+        var decision = Decide("vacances 2019-05-01 10-11-12.jpg", dates: Exif(new DateTime(2019, 4, 1, 9, 0, 0)));
+
+        Assert.Equal(Reasons.ExifOnly, decision.Reason);
+        Assert.Equal(Confidence.Probable, decision.Confidence);
+    }
+
+    [Fact]
+    public void ScreenshotName_LaterThanTheExif_IsStillADisagreement()
+    {
+        var decision = Decide("Screenshot 2025-08-27 211650.png", dates: Exif(new DateTime(2025, 8, 1, 9, 0, 0)));
+
+        Assert.Equal(Reasons.Disagreement, decision.Reason);
+        Assert.Equal(Confidence.Uncertain, decision.Confidence);
+    }
+
+    [Fact]
     public void WhatsApp_NameIsTheTruth_EvenWhenTheFileWasCopiedLater()
     {
         var decision = Decide("IMG-20210915-WA0005.jpg");

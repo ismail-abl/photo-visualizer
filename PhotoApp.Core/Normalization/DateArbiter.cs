@@ -226,6 +226,14 @@ public sealed class DateArbiter
             return new Choice(exif with { Offset = gpsOffset }, Confidence.Certain, reason ?? Reasons.ExifConcordant);
         }
 
+        // Décision de l'utilisateur : un fichier édité (Xiaomi...) garde l'EXIF d'origine et prend un nom à l'heure de l'édition ;
+        // quand l'EXIF précède le nom d'un profil d'appareil, l'EXIF est la source de vérité.
+        if (c.ProfileName is { IsUtc: false } deviceName && c.Reading.Profile?.Family == ProfileFamily.Camera
+            && DateComparison.CompareAt(exif, deviceName, deviceName.Precision) < 0)
+        {
+            return new Choice(exif, Confidence.Certain, reason ?? Reasons.ExifBeforeName);
+        }
+
         return new Choice(exif, Confidence.Probable, reason ?? Reasons.ExifOnly);
     }
 

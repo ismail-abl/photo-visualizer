@@ -14,6 +14,7 @@ public static class DecisionTexts
         [Reasons.ExifWithOffset] = "EXIF avec fuseau",
         [Reasons.QuickTimeApple] = "Date Apple de la vidéo",
         [Reasons.ExifConcordant] = "EXIF confirmé par le nom ou le GPS",
+        [Reasons.ExifBeforeName] = "EXIF d'origine (fichier édité ou enregistré après la prise de vue)",
         [Reasons.ExifOnly] = "EXIF sans fuseau",
         [Reasons.VideoUtcName] = "Date de la vidéo confirmée par le nom",
         [Reasons.ProfileName] = "Nom donné par l'appareil",
