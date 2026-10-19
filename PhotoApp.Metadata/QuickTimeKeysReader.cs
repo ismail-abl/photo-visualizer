@@ -27,7 +27,7 @@ public static class QuickTimeKeysReader
             using var stream = File.OpenRead(path);
             return Read(stream);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return Empty;
         }
@@ -60,7 +60,7 @@ public static class QuickTimeKeysReader
 
             return ReadValues(ReadBytes(stream, ilst.Value), ReadKeyNames(ReadBytes(stream, keys.Value)));
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or NotSupportedException or OverflowException)
         {
             return Empty;
         }
@@ -92,7 +92,7 @@ public static class QuickTimeKeysReader
                 size = to - position;   // jusqu'à la fin du parent
             }
 
-            if (size < headerSize || position + size > to)
+            if (size < headerSize || size > to - position)   // sans débordement, même avec une taille 64 bits démesurée
             {
                 return null;
             }
@@ -126,7 +126,7 @@ public static class QuickTimeKeysReader
     private static byte[] ReadBytes(Stream stream, Box box)
     {
         var length = box.End - box.Start;
-        if (length > MaxListBytes)
+        if (length < 0 || length > MaxListBytes)
         {
             throw new InvalidDataException("Liste de métadonnées QuickTime trop grande.");
         }
@@ -151,7 +151,7 @@ public static class QuickTimeKeysReader
         for (var i = 0; i < count && position + 8 <= bytes.Length; i++)
         {
             var size = (int)BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(position));
-            if (size < 8 || position + size > bytes.Length)
+            if (size < 8 || size > bytes.Length - position)
             {
                 break;
             }
@@ -172,19 +172,19 @@ public static class QuickTimeKeysReader
         while (position + 8 <= bytes.Length)
         {
             var size = (int)BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(position));
-            if (size < 8 || position + size > bytes.Length)
+            if (size < 8 || size > bytes.Length - position)
             {
                 break;
             }
 
             var index = (int)BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(position + 4));
             var data = position + 8;
-            if (index >= 1 && index <= names.Count && data + 16 <= position + size
+            if (index >= 1 && index <= names.Count && 16 <= size - 8
                 && Encoding.ASCII.GetString(bytes, data + 4, 4) == "data")
             {
                 var dataSize = (int)BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(data));
                 var type = BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(data + 8)) & 0x00FFFFFF;
-                if (type == Utf8Type && dataSize >= 16 && data + dataSize <= position + size)
+                if (type == Utf8Type && dataSize >= 16 && dataSize <= position + size - data)
                 {
                     values[names[index - 1]] = Encoding.UTF8.GetString(bytes, data + 16, dataSize - 16);
                 }

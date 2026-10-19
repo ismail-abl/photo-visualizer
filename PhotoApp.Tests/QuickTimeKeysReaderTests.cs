@@ -82,4 +82,41 @@ public sealed class QuickTimeKeysReaderTests
     {
         Assert.Empty(QuickTimeKeysReader.Read(Path.Combine(Path.GetTempPath(), "absent-" + Guid.NewGuid().ToString("N") + ".mov")));
     }
+
+    [Fact]
+    public void Read_HugeLargeSize_IsEmpty_WithoutThrowing()
+    {
+        // moov de premier niveau dont la taille 64 bits est démesurée.
+        using var top = new MemoryStream();
+        top.Write([0, 0, 0, 8, (byte)'f', (byte)'t', (byte)'y', (byte)'p']);
+        top.Write([0, 0, 0, 1, (byte)'m', (byte)'o', (byte)'o', (byte)'v', 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xF0]);
+        top.Position = 0;
+        Assert.Empty(QuickTimeKeysReader.Read(top));
+
+        // moov valide, mais son « keys » interne a une taille 64 bits démesurée (position + taille déborde).
+        using var inner = new MemoryStream();
+        inner.Write([0, 0, 0, 8, (byte)'f', (byte)'t', (byte)'y', (byte)'p']);
+        inner.Write([0, 0, 0, 40, (byte)'m', (byte)'o', (byte)'o', (byte)'v']);
+        inner.Write([0, 0, 0, 32, (byte)'m', (byte)'e', (byte)'t', (byte)'a', 0, 0, 0, 8, (byte)'i', (byte)'l', (byte)'s', (byte)'t']);
+        inner.Write([0, 0, 0, 1, (byte)'k', (byte)'e', (byte)'y', (byte)'s', 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xF0]);
+        inner.Position = 0;
+        Assert.Empty(QuickTimeKeysReader.Read(inner));
+    }
+
+    [Fact]
+    public void Read_BogusKeySize_IsEmpty_WithoutThrowing()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.Combine("clip.mov");
+        TestVideos.Write(path, Header, AppleKeys);
+        var bytes = File.ReadAllBytes(path);
+        var type = bytes.AsSpan().IndexOf("keys"u8);
+        Assert.True(type > 0);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(type + 12), 0x7FFFFFF0);
+        File.WriteAllBytes(path, bytes);
+
+        var keys = QuickTimeKeysReader.Read(path);
+
+        Assert.All(keys.Keys, key => Assert.Contains(key, AppleKeys.Keys));
+    }
 }
