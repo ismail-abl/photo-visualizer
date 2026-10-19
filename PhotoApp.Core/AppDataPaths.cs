@@ -27,6 +27,8 @@ public sealed class AppDataPaths
 
     public string LogsFolder => Path.Combine(DataRoot, "logs");
 
+    public string ReportsFolder => Path.Combine(DataRoot, "reports");
+
     public string DatabasePath => Path.Combine(DataRoot, "catalog.db");
 
     public string ThumbnailsFolder => Path.Combine(CacheRoot, "thumbnails");

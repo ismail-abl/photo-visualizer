@@ -76,4 +76,14 @@ public sealed class AppDataPathsTests
         Assert.True(Directory.Exists(paths.LogsFolder));
         Assert.True(Directory.Exists(paths.ThumbnailsFolder));
     }
+
+    [Fact]
+    public void ReportsFolder_IsUnderTheDataRoot()
+    {
+        var env = new Dictionary<string, string> { ["LOCALAPPDATA"] = @"C:\Users\x\AppData\Local" };
+
+        var paths = AppDataPaths.Resolve(PlatformKind.Windows, k => env.GetValueOrDefault(k), @"C:\Users\x");
+
+        Assert.Equal(Path.Combine(paths.DataRoot, "reports"), paths.ReportsFolder);
+    }
 }
