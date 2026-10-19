@@ -151,4 +151,54 @@ public sealed class MediaNamerTests
         Assert.Null(results[1].ProposedName);
         Assert.Equal("IMG_0477.jpg", results[1].LivePhotoPartner);
     }
+
+    [Fact]
+    public void LivePhoto_BySameBaseName_WithDifferentContentIdentifiers_IsNotPaired()
+    {
+        var results = Name(
+            Input("/a/IMG_0477.heic", Shot, extension: ".heic", contentIdentifier: "AAA"),
+            Input("/a/IMG_0477.mov", Shot, kind: MediaKind.Video, extension: ".mov", contentIdentifier: "BBB"));
+
+        Assert.Equal("IMG-20240105-150412.heic", results[0].ProposedName);
+        Assert.Equal("VID-20240105-150412.mov", results[1].ProposedName);
+        Assert.Null(results[0].LivePhotoPartner);
+        Assert.Null(results[1].LivePhotoPartner);
+    }
+
+    [Fact]
+    public void LivePhoto_BySameBaseName_WhenOnlyOneSideHasAnIdentifier_IsStillPaired()
+    {
+        var results = Name(
+            Input("/a/IMG_0477.heic", Shot, extension: ".heic", contentIdentifier: "AAA"),
+            Input("/a/IMG_0477.mov", Shot, kind: MediaKind.Video, extension: ".mov"));
+
+        Assert.Equal("IMG-20240105-150412.mov", results[1].ProposedName);
+        Assert.Equal("IMG_0477.heic", results[1].LivePhotoPartner);
+    }
+
+    [Fact]
+    public void LivePhoto_WhenTheVideoDateDisagrees_EachFileFollowsItsOwnDecision_AndTheConflictIsReported()
+    {
+        var results = Name(
+            Input("/a/IMG_0477.heic", Shot, extension: ".heic", contentIdentifier: "ABC"),
+            Input("/a/IMG_0478.mov", Shot.AddHours(3), kind: MediaKind.Video, extension: ".mov", contentIdentifier: "ABC"));
+
+        Assert.Equal("IMG-20240105-150412.heic", results[0].ProposedName);
+        Assert.Equal("VID-20240105-180412.mov", results[1].ProposedName);
+        Assert.Null(results[0].LivePhotoPartner);
+        Assert.Null(results[1].LivePhotoPartner);
+        Assert.True(results[0].LivePhotoConflict);
+        Assert.True(results[1].LivePhotoConflict);
+    }
+
+    [Fact]
+    public void LivePhoto_WhenTheVideoHasNoApplicableDecision_StillFollowsThePhoto()
+    {
+        var results = Name(
+            Input("/a/IMG_0477.heic", Shot, extension: ".heic", contentIdentifier: "ABC"),
+            Input("/a/IMG_0478.mov", Shot.AddHours(3), kind: MediaKind.Video, extension: ".mov", contentIdentifier: "ABC", confidence: Confidence.Uncertain));
+
+        Assert.Equal("IMG-20240105-150412.mov", results[1].ProposedName);
+        Assert.False(results[1].LivePhotoConflict);
+    }
 }

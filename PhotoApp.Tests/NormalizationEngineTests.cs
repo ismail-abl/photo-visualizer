@@ -137,4 +137,25 @@ public sealed class NormalizationEngineTests
         Assert.True(result.Decision.Flags.HasFlag(DecisionFlags.SourceIgnored));
         Assert.True(result.Decision.IsApplicable);
     }
+
+    [Fact]
+    public void LivePhotoConflict_IsFlaggedOnBothFiles()
+    {
+        var photoDate = new DateCandidate(new DateTime(2024, 7, 11, 17, 7, 10), DatePrecision.Second, CandidateOrigin.ExifOriginal, TimeSpan.FromHours(2));
+        var videoDate = new DateCandidate(new DateTime(2024, 7, 11, 20, 0, 0), DatePrecision.Second, CandidateOrigin.QuickTimeApple, TimeSpan.FromHours(2));
+
+        var results = Engine().Normalize(
+        [
+            Facts("/p/IMG_0477.HEIC", new RawMetadata { Dates = [photoDate], Make = "Apple", ContentIdentifier = "ID-1", DetectedExtension = "heic" }),
+            Facts("/p/IMG_0477.MOV", new RawMetadata { Dates = [videoDate], Make = "Apple", ContentIdentifier = "ID-1", DetectedExtension = "mov" })
+        ]);
+
+        Assert.All(results, r =>
+        {
+            Assert.True(r.Decision.Flags.HasFlag(DecisionFlags.LivePhotoConflict));
+            Assert.False(r.Decision.Flags.HasFlag(DecisionFlags.LivePhoto));
+            Assert.Null(r.LivePhotoPartner);
+        });
+        Assert.Equal("VID-20240711-200000.mov", results.Single(r => r.Kind == MediaKind.Video).ProposedName);
+    }
 }

@@ -9,7 +9,8 @@ namespace PhotoApp.Core.Normalization;
 public sealed record NamingInput(string FullPath, MediaKind Kind, string TargetExtension, DateDecision Decision, long? Counter, string? ContentIdentifier);
 
 /// <param name="LivePhotoPartner">Nom de fichier actuel de l'autre moitié de la Live Photo.</param>
-public sealed record NamingResult(string? ProposedName, string? LivePhotoPartner);
+/// <param name="LivePhotoConflict">Un couple Live Photo a été dissous : les dates de la photo et de la vidéo divergent.</param>
+public sealed record NamingResult(string? ProposedName, string? LivePhotoPartner, bool LivePhotoConflict = false);
 
 /// <summary>
 /// Propose un nom par média Sûr ou Probable, dossier par dossier (spec de phase 1, §7). Rien n'est renommé ici.
@@ -44,6 +45,17 @@ public sealed class MediaNamer
     private void NameFolder(IReadOnlyList<NamingInput> inputs, List<int> indexes, NamingResult[] results)
     {
         var livePairs = PairLivePhotos(inputs, indexes);
+        var conflicts = new HashSet<int>();
+        foreach (var (video, photo) in livePairs.ToList())
+        {
+            if (DatesDisagree(inputs[video], inputs[photo]))
+            {
+                livePairs.Remove(video);
+                conflicts.Add(video);
+                conflicts.Add(photo);
+            }
+        }
+
         var allocator = new NameAllocator();
         var toAllocate = new List<int>();
 
@@ -80,7 +92,19 @@ public sealed class MediaNamer
             results[video] = new NamingResult(videoName, Path.GetFileName(inputs[photo].FullPath));
             results[photo] = results[photo] with { LivePhotoPartner = Path.GetFileName(inputs[video].FullPath) };
         }
+
+        foreach (var index in conflicts)
+        {
+            results[index] = results[index] with { LivePhotoConflict = true };
+        }
     }
+
+    // Une vidéo qui a sa propre décision applicable, en désaccord avec la date de la photo : ce n'est pas la même prise.
+    // Sans décision applicable, elle suit sa photo (comportement historique).
+    private static bool DatesDisagree(NamingInput video, NamingInput photo) =>
+        video.Decision is { IsApplicable: true, Date: { } videoDate }
+        && photo.Decision.Date is { } photoDate
+        && !DateComparison.Concordant(videoDate, photoDate);
 
     // Ordre réel : heure (sous-secondes comprises), compteur du nom, puis empreinte du contenu pour les égalités restantes.
     private IEnumerable<int> InRealOrder(IReadOnlyList<NamingInput> inputs, List<int> indexes)
@@ -151,7 +175,9 @@ public sealed class MediaNamer
         {
             var stem = Path.GetFileNameWithoutExtension(inputs[video].FullPath);
             var photo = photos.FirstOrDefault(
-                p => !paired.Contains(p) && string.Equals(Path.GetFileNameWithoutExtension(inputs[p].FullPath), stem, StringComparison.OrdinalIgnoreCase),
+                p => !paired.Contains(p)
+                     && string.Equals(Path.GetFileNameWithoutExtension(inputs[p].FullPath), stem, StringComparison.OrdinalIgnoreCase)
+                     && IdentifiersCompatible(inputs[video].ContentIdentifier, inputs[p].ContentIdentifier),
                 -1);
             if (photo >= 0)
             {
@@ -162,6 +188,10 @@ public sealed class MediaNamer
 
         return pairs;
     }
+
+    // Deux identifiants Apple différents désignent deux prises distinctes, même sous un nom de base commun.
+    private static bool IdentifiersCompatible(string? first, string? second) =>
+        first is null || second is null || string.Equals(first, second, StringComparison.Ordinal);
 
     private static string Prefix(NamingInput input) => input.Kind == MediaKind.Video ? "VID" : "IMG";
 }

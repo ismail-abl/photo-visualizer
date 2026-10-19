@@ -59,6 +59,11 @@ public sealed class NormalizationEngine
                     decision = decision with { Flags = decision.Flags | DecisionFlags.SourceIgnored };
                 }
 
+                if (names[i].LivePhotoConflict)
+                {
+                    decision = decision with { Flags = decision.Flags | DecisionFlags.LivePhotoConflict };
+                }
+
                 return new MediaResult(f, kinds[i], targets[i], readings[i], decision, names[i].ProposedName, names[i].LivePhotoPartner);
             })
             .ToList();
