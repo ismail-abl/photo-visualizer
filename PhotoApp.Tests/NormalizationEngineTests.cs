@@ -72,6 +72,27 @@ public sealed class NormalizationEngineTests
     }
 
     [Fact]
+    public void LivePhotoConflict_SecondPassAfterRename_LeavesBothFilesAsTheyAre()
+    {
+        var photoDate = new DateCandidate(new DateTime(2024, 3, 21, 17, 39, 34, 233), DatePrecision.SubSecond, CandidateOrigin.ExifOriginal, TimeSpan.FromHours(1));
+        var videoDate = new DateCandidate(new DateTime(2024, 3, 21, 17, 39, 32), DatePrecision.Second, CandidateOrigin.QuickTimeApple, TimeSpan.FromHours(1));
+        IReadOnlyList<MediaResult> Pass(string photo, string video) => Engine().Normalize(
+        [
+            Facts(photo, new RawMetadata { Dates = [photoDate], Make = "Apple", ContentIdentifier = "ID-1", DetectedExtension = "jpg" }),
+            Facts(video, new RawMetadata { Dates = [videoDate], Make = "Apple", ContentIdentifier = "ID-1", DetectedExtension = "mov" })
+        ]);
+
+        var first = Pass("/p/24-03-21 17-39-34 0071.jpg", "/p/24-03-21 17-39-34 0071.mov");
+        Assert.Equal(["IMG-20240321-173934.jpg", "VID-20240321-173932.mov"], first.Select(r => r.ProposedName));
+
+        // Second passage : les fichiers portent maintenant leurs noms proposés.
+        var second = Pass("/p/" + first[0].ProposedName, "/p/" + first[1].ProposedName);
+
+        Assert.Equal(["IMG-20240321-173934.jpg", "VID-20240321-173932.mov"], second.Select(r => r.ProposedName));
+        Assert.All(second, r => Assert.True(r.Decision.Flags.HasFlag(DecisionFlags.LivePhotoConflict)));
+    }
+
+    [Fact]
     public void RealFormat_DifferentFromTheExtension_IsFlagged_AndUsedForTheName()
     {
         var exif = new DateCandidate(new DateTime(2024, 1, 5, 15, 4, 12), DatePrecision.Second, CandidateOrigin.ExifOriginal, TimeSpan.FromHours(1));

@@ -48,7 +48,7 @@ public sealed class MediaNamer
         var conflicts = new HashSet<int>();
         foreach (var (video, photo) in livePairs.ToList())
         {
-            if (DatesDisagree(inputs[video], inputs[photo]))
+            if (DatesDisagree(inputs[video], inputs[photo]) || VideoKeepsItsOwnName(inputs[video], inputs[photo]))
             {
                 livePairs.Remove(video);
                 conflicts.Add(video);
@@ -105,6 +105,15 @@ public sealed class MediaNamer
         video.Decision is { IsApplicable: true, Date: { } videoDate }
         && photo.Decision.Date is { } photoDate
         && !DateComparison.Concordant(videoDate, photoDate);
+
+    // Second passage : le nom normalisé ne garde que la seconde, la date de la photo perd ses sous-secondes et l'écart
+    // avec la vidéo peut repasser sous la tolérance. Une vidéo déjà nommée VID-… d'après sa propre date, et dont le nom
+    // diffère de celui que lui donnerait sa photo, a été traitée comme un conflit au premier passage : elle le reste.
+    private static bool VideoKeepsItsOwnName(NamingInput video, NamingInput photo) =>
+        video.Decision is { IsApplicable: true, Date: { } videoDate }
+        && photo.Decision.Date is { } photoDate
+        && IsAlreadyNormalized(video, videoDate)
+        && NormalizedFileNameBuilder.BaseName(videoDate, Prefix(video)) != NormalizedFileNameBuilder.BaseName(photoDate, Prefix(video));
 
     // Ordre réel : heure (sous-secondes comprises), compteur du nom, puis empreinte du contenu pour les égalités restantes.
     private IEnumerable<int> InRealOrder(IReadOnlyList<NamingInput> inputs, List<int> indexes)
