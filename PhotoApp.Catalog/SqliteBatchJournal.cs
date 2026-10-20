@@ -153,7 +153,7 @@ public sealed class SqliteBatchJournal(CatalogDatabase database) : IBatchJournal
             // Ouvert sans partage : un second processus échoue, et le système libère le verrou si celui-ci est tué.
             return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new BatchLockedException($"Un autre traitement PhotoManager est en cours (verrou : {path}).", ex);
         }

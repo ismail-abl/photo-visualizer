@@ -95,6 +95,22 @@ public sealed class BatchUndo
         var target = new FileInfo(item.TargetPath);
         if (!target.Exists)
         {
+            // Le journal est écrit après le déplacement : un processus tué entre les deux laisse le fichier déjà restauré,
+            // soit avec les dates du lot (restauration des dates pas encore faite), soit avec ses dates d'origine.
+            var original = new FileInfo(item.SourcePath);
+            if (original.Exists)
+            {
+                if (original.Length == item.SourceSize && original.LastWriteTimeUtc == item.SourceLastWriteUtc)
+                {
+                    return new Restoration(true, null);
+                }
+
+                if (original.Length == item.DoneSize && original.LastWriteTimeUtc == item.DoneLastWriteUtc)
+                {
+                    return RestoreTimes(item);
+                }
+            }
+
             return new Restoration(false, "Fichier introuvable sous son nouveau nom");
         }
 
@@ -119,7 +135,12 @@ public sealed class BatchUndo
             return new Restoration(false, ex.Message);
         }
 
-        // Le fichier a retrouvé son nom d'origine : s'il garde les dates du lot, l'élément est tout de même annulé, avec un avertissement.
+        return RestoreTimes(item);
+    }
+
+    // Le fichier a retrouvé son nom d'origine : s'il garde les dates du lot, l'élément est tout de même annulé, avec un avertissement.
+    private Restoration RestoreTimes(BatchItem item)
+    {
         try
         {
             setTimes(item.SourcePath, item.SourceCreationUtc, item.SourceLastWriteUtc);

@@ -83,6 +83,27 @@ public sealed class BatchUndoTests
     }
 
     [Fact]
+    public void Undo_AfterACrashBetweenTheMoveBackAndTheJournal_MarksTheItemUndone()
+    {
+        using var temp = new TempDirectory();
+        var photos = Photos(temp);
+        var source = WriteFile(photos, "a.jpg", "A");
+        var target = Path.Combine(photos, "IMG-1.jpg");
+        var journal = NewJournal(temp);
+        var batch = CreateBatch(journal, DraftFor(source, target, 0));
+        new InPlaceRenamer(journal).Run(batch);
+        // État d'un processus tué : fichier déjà remis sous son nom d'origine, élément encore « fait ».
+        File.Move(target, source);
+
+        var summary = new BatchUndo(journal).Undo(batch);
+
+Assert.Equal(new UndoSummary(batch, 1, 0, true), summary);
+        Assert.Equal("A", File.ReadAllText(source));
+        Assert.Equal(ItemState.Undone, journal.GetItems(batch).Single().State);
+        Assert.Equal(BatchState.Undone, journal.GetBatch(batch)!.State);
+    }
+
+    [Fact]
     public void Undo_AnAlreadyUndoneBatch_Throws()
     {
         using var temp = new TempDirectory();
@@ -170,7 +191,7 @@ public sealed class BatchUndoTests
         Assert.Equal(ItemState.Undone, item.State);
         Assert.StartsWith("nom restauré, dates d'origine non restaurées", item.Error);
         Assert.Contains("verrouillé", item.Error);
-        Assert.Equal(new UndoSummary(batch, 1, 0, true), summary);
+Assert.Equal(new UndoSummary(batch, 1, 0, true), summary);
         Assert.Equal(BatchState.Undone, journal.GetBatch(batch)!.State);
     }
 }

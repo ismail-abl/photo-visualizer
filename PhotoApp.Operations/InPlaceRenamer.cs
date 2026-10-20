@@ -38,7 +38,7 @@ public sealed class InPlaceRenamer
     // L'appelant doit déjà tenir le verrou d'exécution (IBatchJournal.AcquireExecutionLock) : ce verrou n'est pas réentrant.
     internal BatchRunSummary RunWithLockHeld(long batchId, CancellationToken cancellation = default, IProgress<BatchProgress>? progress = null)
     {
-        var batch =journal.GetBatch(batchId) ?? throw new InvalidOperationException($"Lot {batchId} introuvable.");
+        var batch = journal.GetBatch(batchId) ?? throw new InvalidOperationException($"Lot {batchId} introuvable.");
         if (batch.State is BatchState.Completed or BatchState.Undone)
         {
             throw new InvalidOperationException($"Le lot {batchId} est déjà terminé.");
