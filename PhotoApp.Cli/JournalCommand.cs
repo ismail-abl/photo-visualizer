@@ -27,9 +27,12 @@ public sealed class JournalCommand(AppDataPaths paths, TextWriter output, TextWr
         foreach (var batch in batches)
         {
             var counts = batch.Counts;
+            // Les fichiers annulés et non restaurés ne sont mentionnés que s'il y en a.
+            var undoneText = counts.Undone > 0 ? $", {counts.Undone} annulé(s)" : "";
+            var undoFailedText = counts.UndoFailed > 0 ? $", {counts.UndoFailed} non restauré(s)" : "";
             output.WriteLine(
                 $"{batch.Id,4}  {Local(batch.CreatedUtc)}  {BatchSummaryPrinter.BatchStateLabel(batch.State),-10}  " +
-                $"{counts.Done} fait(s), {counts.Failed} échec(s), {counts.Skipped} écarté(s)  {string.Join(" ; ", batch.Folders)}");
+                $"{counts.Done} fait(s), {counts.Failed} échec(s), {counts.Skipped} écarté(s){undoneText}{undoFailedText}  {string.Join(" ; ", batch.Folders)}");
         }
 
         if (journal.FindUnfinished() is { } unfinished)
