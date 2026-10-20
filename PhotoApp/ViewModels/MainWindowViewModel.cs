@@ -77,6 +77,9 @@ public partial class MainWindowViewModel : ViewModelBase
     // Pas de changement de dossier pendant une conversion, un renommage ou une confirmation en attente.
     public bool CanChooseFolder => !IsConverting && !IsRenaming && !IsRenameConfirmationPending;
 
+    // Le bouton d'arrêt n'apparaît qu'une fois le lot lancé (pas pendant la préparation du plan).
+    public bool CanStopBatch => IsRenaming && _renameCancellation is not null;
+
     public async Task SetSelectedFolderAndScanAsync(string selectedFolderPath)
     {
         SelectedFolderPath = selectedFolderPath;
@@ -284,6 +287,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IsRenaming = true;
         _renameCancellation = new CancellationTokenSource();
         var token = _renameCancellation.Token;
+        OnPropertyChanged(nameof(CanStopBatch));
         var renaming = new Progress<BatchProgress>(p => RenameStatus = $"{(prepared is null ? "Annulation" : "Renommage")} : {p.Processed} / {p.Total}");
         try
         {
@@ -301,7 +305,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 var summary = await Task.Run(() => new BatchUndo(journal).Undo(batchId, token, renaming));
                 RenameStatus = summary.Completed
                     ? $"Lot {batchId} annulé : {summary.Restored} fichier(s) restauré(s)."
-                    : $"Lot {batchId} partiellement annulé : {summary.Restored} restauré(s), {summary.Failed} laissé(s) en place (voir « photoapp journal --lot {batchId} »).";
+                    : token.IsCancellationRequested
+                        ? $"Annulation du lot {batchId} interrompue : {summary.Restored} fichier(s) restauré(s), {summary.Failed} en échec ; les autres restent à restaurer, relancez « Annuler le dernier lot »."
+                        : $"Lot {batchId} partiellement annulé : {summary.Restored} restauré(s), {summary.Failed} laissé(s) en place (voir « photoapp journal --lot {batchId} »).";
             }
         }
         catch (Exception ex)
@@ -314,6 +320,8 @@ public partial class MainWindowViewModel : ViewModelBase
             _renameCancellation = null;
             _preparedRename = null;
             _preparedUndoBatchId = null;
+            _results = [];
+            OnPropertyChanged(nameof(CanStopBatch));
             IsRenaming = false;
         }
 
@@ -326,7 +334,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (IsRenaming)
         {
-            _renameCancellation?.Cancel();
+            if (_renameCancellation is null)
+            {
+                return;
+            }
+
+            _renameCancellation.Cancel();
             RenameStatus = "Arrêt demandé : le fichier en cours se termine.";
             return;
         }

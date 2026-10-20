@@ -51,7 +51,7 @@
                 <Button Content="Confirmer" Command="{Binding ConfirmCommand}" />
                 <Button Content="Abandonner" Command="{Binding AbortCommand}" />
             </StackPanel>
-            <Button Content="Arrêter le lot en cours" Command="{Binding AbortCommand}" IsVisible="{Binding IsRenaming}" />
+            <Button Content="Arrêter le lot en cours" Command="{Binding AbortCommand}" IsVisible="{Binding CanStopBatch}" />
         </StackPanel>
 
         <TextBlock Grid.Row="3" Text="{Binding ImageCount, StringFormat='Images trouvées: {0}'}" />
