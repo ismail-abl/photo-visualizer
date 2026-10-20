@@ -1,7 +1,7 @@
 # Phase 2 — Exécution sûre (renommage sur place)
 
 - **Date :** 2026-10-19
-- **Statut :** validé en brainstorming, en attente de relecture
+- **Statut :** implémentée sur la branche feat/phase2-execution-sure, en attente de validation
 - **Cadre :** [vision et feuille de route](2026-10-14-vision-feuille-de-route-design.md), §6.2, §7 et §10 (phase 2). Cette spec précise la phase ; en cas d'écart, elle l'emporte sur le cadre pour la phase 2. Elle s'appuie sur le moteur de la [phase 1](2026-10-19-phase1-moteur-normalisation-design.md).
 
 ---
@@ -184,3 +184,4 @@ Le flux actuel (dossier de sortie, conversion JPEG) reste en place. L'aperçu d�
 | Fichiers renommés par défaut | Sûre **et** Probable ; le dry-run reste le comportement de base, `--applique` déclenche l'exécution |
 | Points ouverts de la phase 1 | Les quatre traités : garde GPS, Live Photo, captures (métadonnée antérieure au nom), test du profil epoch |
 | Stratégie de renommage | Journal d'abord, déplacements directs, un seul renommage par fichier ; pas de noms temporaires |
+| Écarts d'implémentation | Verrou d'exécution par fichier `catalog.db.lock` ; colonne « options » du lot supprimée ; code de sortie 3 aussi pour un lot interrompu ; changement de casse seul en deux temps (voir le plan, « Écarts assumés ») |

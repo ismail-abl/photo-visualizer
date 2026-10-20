@@ -3,7 +3,7 @@
 Application desktop locale, hors ligne, pour normaliser les dates et les noms de photos personnelles, les parcourir et les convertir en JPEG sans perdre leurs métadonnées. Développée en priorité pour Windows, portable sur Linux et macOS.
 
 - **Vision et feuille de route :** [`docs/superpowers/specs/2026-10-14-vision-feuille-de-route-design.md`](docs/superpowers/specs/2026-10-14-vision-feuille-de-route-design.md)
-- **Phase en cours :** phase 1 (moteur de normalisation, lecture seule) implémentée sur la branche `feat/phase1-normalisation`, en attente de validation : objectif de 94 % Sûre + Probable atteint sur la bibliothèque réelle, vérification visuelle de l'interface à faire — spec : [`docs/superpowers/specs/2026-10-19-phase1-moteur-normalisation-design.md`](docs/superpowers/specs/2026-10-19-phase1-moteur-normalisation-design.md), plan : [`docs/superpowers/plans/2026-10-19-phase1-moteur-normalisation.md`](docs/superpowers/plans/2026-10-19-phase1-moteur-normalisation.md). Prochaine étape : phase 2, exécution sûre (renommage sur place, journal, annulation).
+- **Phase en cours :** phase 2 (exécution sûre : renommage sur place, journal, reprise, annulation) implémentée sur la branche `feat/phase2-execution-sure`, en attente de validation — spec : [`docs/superpowers/specs/2026-10-19-phase2-execution-sure-design.md`](docs/superpowers/specs/2026-10-19-phase2-execution-sure-design.md), plan : [`docs/superpowers/plans/2026-10-19-phase2-execution-sure.md`](docs/superpowers/plans/2026-10-19-phase2-execution-sure.md). Phase 1 (moteur de normalisation) terminée. Prochaine étape : phase 3, écriture des métadonnées internes et conversion sur place.
 
 ## Ce qui marche aujourd'hui
 
@@ -14,6 +14,9 @@ Application desktop locale, hors ligne, pour normaliser les dates et les noms de
   - Dates JJ/MM ambiguës tranchées par les fichiers voisins ou par un autre candidat, sinon signalées.
   - La date du fichier (souvent celle de la copie) n'est jamais appliquée.
 - **Commande `photoapp analyse`** en lecture seule : rapport CSV (une ligne par média : profil, date, confiance, raison, nom proposé, tous les candidats) et résumé (répartition, profils, motifs de nom inconnus).
+- **Renommage sur place** (`photoapp renomme`) : applique les noms proposés (Sûre et Probable) aux photos **et aux vidéos**, avec leurs Live Photo et sidecars, et fixe les dates du fichier (création et modification) sur la date décidée. Aperçu par défaut ; `--applique` exécute. Le lot est figé puis journalisé (SQLite, `catalog.db`) avant chaque action ; un fichier modifié depuis le plan, un nom cible déjà pris ou un fichier verrouillé est écarté avec sa raison, jamais écrasé.
+- **Journal, reprise, annulation** : `photoapp journal` liste les lots, `photoapp annule` restaure noms, contenus et dates d'origine (un fichier retouché depuis le lot est laissé en place et signalé), `photoapp reprend` termine un lot interrompu (Ctrl+C ou arrêt brutal).
+- **Interface** : boutons « Renommer sur place » et « Annuler le dernier lot », avec confirmation.
 - **Noms proposés** : `IMG-…` pour les photos, `VID-…` pour les vidéos, Live Photo associées (même nom de base), collisions numérotées dans l'ordre réel (sous-secondes, compteur WhatsApp, empreinte), vrai format détecté.
 - Nommage : `IMG-AAAAMMJJ-HHmmss.jpg` ; même seconde : `-01`, `-02`… dans l'ordre chronologique puis alphabétique ; jour seul : `IMG-AAAAMMJJ-000000-NN.jpg`. Un nom déjà attribué n'est jamais renuméroté.
 - Conversion JPEG via Magick.NET : JPEG copié tel quel ; PNG, WebP, TIFF, BMP, **HEIC, HEIF, AVIF** décodés, orientés, transparence sur fond blanc, profils EXIF/XMP/ICC conservés. GIF non converti (animation).
@@ -27,9 +30,10 @@ Application desktop locale, hors ligne, pour normaliser les dates et les noms de
 - Une heure EXIF sans décalage est interprétée dans le fuseau du PC ; le décalage horaire par lot (ex. photos de voyage) arrive en phase 3.
 - L'empreinte d'idempotence est la taille + la date de modification de la source ; le SHA-256 arrive avec les doublons (phase 5).
 - Une conversion HEIC ou AVIF → JPEG produit souvent un fichier plus lourd : c'est voulu, la compatibilité prime. La règle « ignorer si plus lourd » (phase 5) ne s’appliquera pas à HEIC/HEIF/AVIF.
-- Pas encore de galerie, de journal, d'annulation ni de quarantaine (phases 2 et 4). L'option « Effacer l'original après succès » supprime réellement l'original : la laisser décochée pour tout essai.
+- Pas encore de galerie ni d'écrans Aperçu et Journal dans l'interface (phase 4) ; la quarantaine existe comme brique testée mais n'est pas encore utilisée (conversion sur place, phase 3). L'option « Effacer l'original après succès » du flux de conversion supprime réellement l'original : la laisser décochée pour tout essai.
+- Les fichiers HEIC, HEIF et AVIF sont renommés tels quels (conversion sur place en phase 3).
 - Les outils manuels (décalage horaire par lot, date fixée, choix d'un candidat) arrivent en phase 3 ou 4 ; les sidecars Google Takeout en phase 8.
-- L'interface ignore encore les vidéos (renommage sur place et vidéos : phase 2). La CLI les analyse.
+- La liste de l'interface et la conversion ne montrent que les photos ; le renommage sur place traite aussi les vidéos.
 
 ## Architecture
 
@@ -38,9 +42,9 @@ PhotoApp/              interface Avalonia (MVVM)
 PhotoApp.Core/         pur, sans E/S ni paquet : modèles, profils de sources (Profiles), moteur de normalisation
                        (Normalization : comparaison, arbitre, ambiguïtés, nommage), racines de données (AppDataPaths)
 PhotoApp.Metadata/     lecture des métadonnées brutes (MetadataExtractor + clés Apple QuickTime)
-PhotoApp.Catalog/      scan des dossiers (photos, vidéos, sidecars) et analyse complète (MediaAnalyzer)
-PhotoApp.Cli/          commande « analyse » en lecture seule (ne référence jamais Operations)
-PhotoApp.Operations/   conversion (Magick.NET), exécution du lot, manifeste, ConversionService
+PhotoApp.Catalog/      scan des dossiers (photos, vidéos, sidecars), analyse complète (MediaAnalyzer), base SQLite catalog.db (journal des lots, quarantaine)
+PhotoApp.Cli/          commandes analyse (lecture seule), renomme, journal, annule, reprend
+PhotoApp.Operations/   renommage sur place (planificateur, exécuteur, reprise, annulation, quarantaine), conversion (Magick.NET), manifeste
 PhotoApp.Tests/        tests xUnit ; images d'exemple générées à l'exécution (aucune donnée privée)
 ```
 
@@ -50,7 +54,7 @@ Tout ce que l'application produit, hors dossier `Converted`, vit sous des racine
 
 | | Windows | Linux | macOS |
 |---|---|---|---|
-| Données (manifestes, rapports d'analyse, futur catalogue) | `%LOCALAPPDATA%\PhotoManager\` | `$XDG_DATA_HOME/photomanager/` | `~/Library/Application Support/PhotoManager/` |
+| Données (manifestes, rapports, base `catalog.db`) | `%LOCALAPPDATA%\PhotoManager\` | `$XDG_DATA_HOME/photomanager/` | `~/Library/Application Support/PhotoManager/` |
 | Cache | `%LOCALAPPDATA%\PhotoManager\cache\` | `$XDG_CACHE_HOME/photomanager/` | `~/Library/Caches/PhotoManager/` |
 
 Les manifestes sont dans `manifests/`, un fichier JSON par dossier de sortie.
@@ -84,12 +88,35 @@ dotnet run --project PhotoApp.Cli -c Release -- analyse "D:\Photos" "D:\Vidéos"
 - Le CSV s'ouvre directement dans Excel ou LibreOffice (UTF-8 avec BOM, séparateur `;`).
 - Codes de sortie : 0 analyse faite (même avec des fichiers illisibles, listés dans le rapport), 1 argument invalide, 2 erreur fatale.
 
+## Renommer sur place
+
+```powershell
+# Aperçu : affiche le plan et écrit un CSV dans reports\, ne modifie aucun fichier.
+dotnet run --project PhotoApp.Cli -c Release -- renomme "D:\Photos"
+
+# Exécution (demande confirmation ; --oui pour s'en passer).
+dotnet run --project PhotoApp.Cli -c Release -- renomme "D:\Photos" --applique
+
+# Traiter par tranches de 500 groupes (dossier synchronisé Nextcloud).
+dotnet run --project PhotoApp.Cli -c Release -- renomme "D:\Photos" --applique --tranche 500
+
+dotnet run --project PhotoApp.Cli -c Release -- journal            # liste des lots
+dotnet run --project PhotoApp.Cli -c Release -- journal --lot 1    # détail d'un lot
+dotnet run --project PhotoApp.Cli -c Release -- annule             # annule le dernier lot terminé
+dotnet run --project PhotoApp.Cli -c Release -- reprend 1          # termine un lot interrompu
+```
+
+- Seules les confiances **Sûre** et **Probable** sont renommées. Rien n'est jamais écrasé ni supprimé : seuls le nom et les dates du fichier changent.
+- Codes de sortie : 0 succès, 1 argument invalide, 2 erreur fatale, 3 lot terminé avec des échecs ou interrompu.
+- Toujours essayer sur une **copie** d'un petit dossier avant la bibliothèque réelle.
+
 ## Test manuel recommandé
 
 1. Copier quelques photos variées dans un dossier de test (jamais sur la bibliothèque réelle).
 2. Lancer l'application et choisir ce dossier : vérifier dates, sources, noms cibles et les mentions « À vérifier ».
 3. Convertir **sans** suppression des originaux, contrôler `Converted`.
 4. Convertir une seconde fois : le résumé doit indiquer `0 converti(s)` et tous les fichiers « déjà faits ».
+5. Renommer sur place : `renomme` (aperçu), `renomme --applique`, `journal`, puis `annule` : la comparaison des noms, contenus et dates avec l'état initial doit être identique.
 
 ## Décisions actées
 
