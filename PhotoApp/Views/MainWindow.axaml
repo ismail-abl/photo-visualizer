@@ -23,8 +23,10 @@
 
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="16" RowSpacing="12">
         <StackPanel Orientation="Horizontal" Spacing="8" Grid.Row="0">
-            <Button Content="Choisir un dossier" Click="ChooseFolderButton_OnClick" IsEnabled="{Binding !IsConverting}" />
+            <Button Content="Choisir un dossier" Click="ChooseFolderButton_OnClick" IsEnabled="{Binding CanChooseFolder}" />
             <Button Content="Convertir" Command="{Binding ConvertCommand}" />
+            <Button Content="Renommer sur place" Command="{Binding PrepareRenameCommand}" />
+            <Button Content="Annuler le dernier lot" Command="{Binding PrepareUndoCommand}" />
             <CheckBox Content="Effacer l'original après succès" IsChecked="{Binding DeleteOriginalAfterSuccess}" IsEnabled="{Binding !IsConverting}" VerticalAlignment="Center" />
         </StackPanel>
 
@@ -43,6 +45,13 @@
         <StackPanel Grid.Row="2" Spacing="4">
             <TextBlock Text="{Binding SelectedFolderPath, FallbackValue=Aucun dossier sélectionné}" TextWrapping="Wrap" />
             <TextBlock Text="{Binding ConversionStatus}" Foreground="DarkGreen" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding RenameStatus}" Foreground="DarkBlue" FontWeight="SemiBold" TextWrapping="Wrap"
+                       IsVisible="{Binding RenameStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsRenameConfirmationPending}">
+                <Button Content="Confirmer" Command="{Binding ConfirmCommand}" />
+                <Button Content="Abandonner" Command="{Binding AbortCommand}" />
+            </StackPanel>
+            <Button Content="Arrêter le lot en cours" Command="{Binding AbortCommand}" IsVisible="{Binding IsRenaming}" />
         </StackPanel>
 
         <TextBlock Grid.Row="3" Text="{Binding ImageCount, StringFormat='Images trouvées: {0}'}" />
